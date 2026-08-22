@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "ATLAS ChatGPT Workflow Controls",
+  "version": "0.1.0",
+  "description": "First-party ATLAS workflow controls for chatgpt.com.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+IFpAH9s+L0oQEna41SBN+W4Mt1BVg1Jlmbl7vEctBFUlDH7pW4tyatN+LEyxWxhAOgdFNMaw00MOkz0Zm1jMyGRw79+cubtttcgcjlbeBQpwrVGOT7Vl+mQEhGeebxVpLF/NJkCgvTRp/j7o2kOxtVfLR+gk946yaRZei13PVimsQEavh+qRcjUfPROyk4cXe8Xc+kTmegc6d5w4KACeVncXfqjeBcs+JmkBBa1pLMsmbtgBeKF2B9Y7jjCwvLVRnzFLH28HlU+zBok4WdYhFR7So/b2AWQC8OjHp4McdrMwsqRizEYfjA2IRskxnG6NbOZvboGxa6cxy7096K3kQIDAQAB",
+  "permissions": ["identity", "storage"],
+  "host_permissions": ["https://chatgpt.com/*"],
+  "background": {
+    "service_worker": "serviceWorker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

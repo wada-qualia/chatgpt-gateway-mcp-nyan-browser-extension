@@ -1,0 +1,50 @@
+.atlas-extension-menu,
+.atlas-extension-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  position: relative;
+  font: inherit;
+}
+
+.atlas-extension-toggle,
+.atlas-extension-options button,
+.atlas-extension-actions button {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.atlas-extension-options {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 2147483000;
+  min-width: 140px;
+  padding: 6px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 6px 24px color-mix(in srgb, CanvasText 18%, transparent);
+}
+
+.atlas-extension-options[hidden] {
+  display: none;
+}
+
+.atlas-extension-options button {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  text-align: left;
+}
+
+.atlas-extension-actions {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
