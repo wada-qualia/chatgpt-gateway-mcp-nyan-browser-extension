@@ -41,6 +41,45 @@ function buildComposerControls(): HTMLElement {
     });
     menu.append(button);
   }
+
+  const authButton = document.createElement("button");
+  authButton.type = "button";
+  authButton.dataset.atlasAuthControl = "true";
+
+  const refreshAuthButton = async (): Promise<void> => {
+    const status = await runtime({ type: "auth:get-status" });
+    const signedIn = status.ok && status.value === true;
+    authButton.textContent = signedIn ? "Sign out" : "Sign in";
+    authButton.setAttribute(
+      "aria-label",
+      signedIn ? "Sign out of ATLAS Gateway" : "Sign in to ATLAS Gateway",
+    );
+    authButton.title = status.ok ? "" : status.error;
+  };
+
+  authButton.addEventListener("click", () => {
+    void (async () => {
+      const status = await runtime({ type: "auth:get-status" });
+      if (!status.ok) {
+        authButton.title = status.error;
+        return;
+      }
+      const request: RuntimeRequest =
+        status.value === true
+          ? { type: "auth:logout" }
+          : { type: "auth:login" };
+      const result = await runtime(request);
+      if (!result.ok) {
+        authButton.title = result.error;
+        return;
+      }
+      menu.hidden = true;
+      await refreshAuthButton();
+    })();
+  });
+  menu.append(authButton);
+  void refreshAuthButton();
+
   toggle.addEventListener("click", () => {
     menu.hidden = !menu.hidden;
   });

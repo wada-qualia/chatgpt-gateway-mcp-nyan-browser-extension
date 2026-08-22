@@ -11,9 +11,15 @@ First-party Chrome Manifest V3 development extension that adds ATLAS workflow co
 
 ## Identity and security
 
-The deterministic development extension ID is `cgaalfflopmcbaodnlphklclnnhmdhcn`. The repository stores only the public manifest key; no private signing key is required or committed. The corresponding exact OAuth redirect planned for Gateway integration is `https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2`.
+The deterministic development extension ID is `cgaalfflopmcbaodnlphklclnnhmdhcn`. The repository stores only the public manifest key; no private signing key is required or committed. The Gateway browser-client contract pins the corresponding exact OAuth redirect to `https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2`. The public client ID is `atlas-chatgpt-browser-extension`, and its only OAuth scope is `workspace:read`.
 
 The content script runs in the isolated world. Gateway bearer credentials are confined to the MV3 service worker and `chrome.storage.session`. The manifest grants only `identity`, `storage`, and exact HTTPS origins. There is no `<all_urls>`, `eval`, remote executable code, `tabs`, or `webRequest` permission.
+
+## Authentication
+
+The ATLAS menu exposes explicit **Sign in** / **Sign out** controls. Sign in is always initiated by a user click and stays in the service worker: it resolves the exact Chromium redirect with `chrome.identity.getRedirectURL("oauth2")`, verifies that it equals the pinned redirect above, generates high-entropy `state` and an S256 PKCE verifier/challenge, resumes the Gateway `/oauth/authorize` request through `/auth/login`, validates callback origin/path/state, and exchanges the code at `/oauth/token` as a public client without a `client_secret`.
+
+Only the bearer access token, expiry timestamp and `workspace:read` scope are stored in `chrome.storage.session`. Expired, legacy or wrong-scope tokens fail closed and are removed. No bearer value is returned to the content script or written to DOM/page JavaScript. Sign out clears the session token locally; the Gateway access token is additionally bounded by the one-hour browser-client TTL.
 
 ## Prompt delivery
 
@@ -41,7 +47,7 @@ node scripts/generate-sbom.mjs
 node scripts/generate-provenance.mjs
 ```
 
-Set `ATLAS_GATEWAY_ORIGIN` to the approved exact HTTPS Gateway origin when producing a build that may contact Gateway. The build injects only that exact origin into `host_permissions`; it rejects non-HTTPS or non-origin values.
+Set `ATLAS_GATEWAY_ORIGIN` to the approved exact HTTPS Gateway origin when producing a build that may contact Gateway, and optionally set `ATLAS_PROMPT_CHANNEL` (default `dev`). The build injects the origin into both the service-worker runtime configuration and the exact matching `host_permissions` entry; it rejects non-HTTPS/non-origin values and invalid channel names. The accepted current public Gateway origin is `https://gateway.example.com`, but it is intentionally not an implicit build default: networking remains an explicit build-time opt-in.
 
 ## CI/CD and artifacts
 
@@ -62,4 +68,4 @@ Extension rollback is artifact-local: restore the previous verified ZIP/unpacked
 
 ## Current integration status
 
-The extension runtime/cache/action/DOM skeleton and independent artifact lane are implemented on the development feature line. Gateway OAuth PKCE/login-resume, exact Chromium redirect registration, least-privilege extension scopes, root control-plane placement registration, and controlled live Chrome pilot remain separate acceptance work and are not claimed complete here.
+The extension runtime/cache/action/DOM skeleton, Gateway OAuth public-client PKCE/login-resume path, exact Chromium redirect pinning, least-privilege `workspace:read` scope and independent artifact lane are implemented on the development feature line. Root control-plane placement registration and the controlled live Chrome pilot remain separate acceptance work and are not claimed complete here.

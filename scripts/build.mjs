@@ -8,6 +8,28 @@ const dist = resolve(root, "dist");
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
+const gatewayOriginInput = process.env.ATLAS_GATEWAY_ORIGIN?.trim() ?? "";
+let gatewayOrigin = "";
+if (gatewayOriginInput) {
+  const url = new URL(gatewayOriginInput);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("ATLAS_GATEWAY_ORIGIN must be an exact HTTPS origin");
+  }
+  gatewayOrigin = url.origin;
+}
+
+const promptChannel = process.env.ATLAS_PROMPT_CHANNEL?.trim() || "dev";
+if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(promptChannel)) {
+  throw new Error("ATLAS_PROMPT_CHANNEL is invalid");
+}
+
 await build({
   absWorkingDir: root,
   entryPoints: ["src/content.ts", "src/serviceWorker.ts"],
@@ -19,25 +41,19 @@ await build({
   sourcemap: false,
   minify: false,
   legalComments: "none",
+  define: {
+    __ATLAS_GATEWAY_ORIGIN__: JSON.stringify(gatewayOrigin),
+    __ATLAS_PROMPT_CHANNEL__: JSON.stringify(promptChannel),
+  },
 });
 
 await cp(resolve(root, "src/styles.css"), resolve(dist, "styles.css"));
 const manifest = JSON.parse(
   await readFile(resolve(root, "manifest.json"), "utf8"),
 );
-const gatewayOrigin = process.env.ATLAS_GATEWAY_ORIGIN?.trim();
 if (gatewayOrigin) {
-  const url = new URL(gatewayOrigin);
-  if (
-    url.protocol !== "https:" ||
-    url.pathname !== "/" ||
-    url.search ||
-    url.hash
-  ) {
-    throw new Error("ATLAS_GATEWAY_ORIGIN must be an HTTPS origin");
-  }
   manifest.host_permissions = [
-    ...new Set([...manifest.host_permissions, `${url.origin}/*`]),
+    ...new Set([...manifest.host_permissions, `${gatewayOrigin}/*`]),
   ].sort();
 }
 await writeFile(

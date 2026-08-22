@@ -54,7 +54,9 @@ export type AtlasActionsEnvelope = {
 export type RuntimeRequest =
   | { type: "prompt:get"; promptId: string }
   | { type: "prompt:refresh" }
-  | { type: "auth:get-status" };
+  | { type: "auth:get-status" }
+  | { type: "auth:login" }
+  | { type: "auth:logout" };
 
 export type RuntimeResponse =
   | { ok: true; value: unknown }
