@@ -54,6 +54,8 @@ GitLab CI is independent from Gateway and Prompt Registry deployment. It validat
 
 Extension-only CI performs no Gateway blue/green deployment and no Prompt Registry deployment or publication.
 
+The GitLab project must have an online untagged-capable Docker runner assigned, and the identity that creates a pipeline must retain project membership sufficient to read the repository. Keep repository visibility and CI job-token protections intact; fix missing runner assignment or membership instead of weakening those controls. When a pipeline fails before source checkout, prefer a new push pipeline after repairing project configuration rather than retrying a terminal job whose ephemeral pipeline ref may already have been removed.
+
 ## Rollback
 
 Extension rollback is artifact-local: restore the previous verified ZIP/unpacked directory and reload the controlled development profile. Prompt-data rollback remains a Prompt Registry channel-pointer operation, and Gateway rollback is independent. No rollback domain rewrites another domain's data.
