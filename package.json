@@ -19,13 +19,11 @@
     "package": "bash scripts/package.sh",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run manifest:check"
   },
-  "dependencies": {
-    "ajv": "8.20.0"
-  },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@types/chrome": "0.0.287",
     "@types/node": "22.10.2",
+    "ajv": "8.20.0",
     "typescript-eslint": "8.18.1",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",

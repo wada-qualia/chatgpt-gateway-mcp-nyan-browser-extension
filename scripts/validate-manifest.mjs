@@ -49,4 +49,19 @@ for (const forbidden of ["eval(", "http://", "https://*."]) {
   if (serialized.includes(forbidden))
     throw new Error(`forbidden manifest token: ${forbidden}`);
 }
+
+for (const scriptName of ["content.js", "serviceWorker.js"]) {
+  const script = await readFile(
+    resolve(process.cwd(), "dist", scriptName),
+    "utf8",
+  );
+  for (const [label, pattern] of [
+    ["eval", /\beval\s*\(/u],
+    ["Function constructor", /\bnew\s+Function\s*\(/u],
+  ]) {
+    if (pattern.test(script)) {
+      throw new Error(`${scriptName} contains CSP-unsafe ${label}`);
+    }
+  }
+}
 console.log("manifest policy: passed");

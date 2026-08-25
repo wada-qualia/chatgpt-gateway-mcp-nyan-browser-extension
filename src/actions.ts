@@ -1,10 +1,6 @@
-import Ajv from "ajv";
-
-import { atlasActionsSchema } from "./actionSchema";
+import { validateAtlasActionsSchema } from "./actionSchema";
 import type { AtlasActionsEnvelope } from "./types";
 
-const ajv = new Ajv({ allErrors: true, strict: true });
-const validate = ajv.compile(atlasActionsSchema);
 const forbiddenKeys = new Set(["__proto__", "prototype", "constructor"]);
 const blockPattern = /```atlas-actions\s*\n([\s\S]*?)\n```/g;
 
@@ -29,7 +25,8 @@ export function parseAtlasActions(text: string): AtlasActionsEnvelope | null {
   } catch {
     return null;
   }
-  if (hasForbiddenKey(decoded) || !validate(decoded)) return null;
+  if (hasForbiddenKey(decoded) || !validateAtlasActionsSchema(decoded))
+    return null;
 
   const envelope = decoded as AtlasActionsEnvelope;
   const ids = new Set<string>();
