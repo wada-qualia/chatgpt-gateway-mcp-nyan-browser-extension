@@ -1,5 +1,10 @@
+import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 
+import {
+  atlasActionsSchema,
+  validateAtlasActionsSchema,
+} from "../src/actionSchema";
 import { parseAtlasActions } from "../src/actions";
 
 function block(payload: unknown): string {
@@ -18,6 +23,40 @@ const valid = {
     },
   ],
 };
+
+describe("validateAtlasActionsSchema", () => {
+  it("matches AJV for the supported contract surface", () => {
+    const validateWithAjv = new Ajv({ allErrors: true, strict: true }).compile(
+      atlasActionsSchema,
+    );
+    const action = valid.actions[0];
+    const cases: unknown[] = [
+      valid,
+      { ...valid, schema_version: 2 },
+      { ...valid, workflow: "" },
+      { ...valid, workflow: "x".repeat(129) },
+      { ...valid, actions: [] },
+      { ...valid, actions: Array.from({ length: 17 }, () => action) },
+      { ...valid, actions: [{ ...action, id: "?invalid" }] },
+      { ...valid, actions: [{ ...action, label: "" }] },
+      { ...valid, actions: [{ ...action, label: "🙂".repeat(160) }] },
+      { ...valid, actions: [{ ...action, label: "🙂".repeat(161) }] },
+      { ...valid, actions: [{ ...action, kind: "send" }] },
+      { ...valid, actions: [{ ...action, prompt: "" }] },
+      { ...valid, actions: [{ ...action, prompt: "x".repeat(12_001) }] },
+      { ...valid, actions: [{ ...action, auto_send: false }] },
+      { ...valid, actions: [{ ...action, auto_send: true }] },
+      { ...valid, actions: [{ ...action, unexpected: true }] },
+      { ...valid, unexpected: true },
+    ];
+
+    for (const payload of cases) {
+      expect(validateAtlasActionsSchema(payload), JSON.stringify(payload)).toBe(
+        validateWithAjv(payload),
+      );
+    }
+  });
+});
 
 describe("parseAtlasActions", () => {
   it("accepts one valid tagged block", () => {
