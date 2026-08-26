@@ -53,13 +53,29 @@ describe("ChatGptDomAdapter", () => {
 
     const control = document.createElement("div");
     expect(adapter.mountComposerControls(control)).toBe(true);
-    expect(control.parentElement).toBe(document.querySelector("form"));
+    expect(control.parentElement).toBe(document.body);
     expect(control.style.left).toBe("8px");
     expect(control.style.top).toBe("14px");
     expect(control.hidden).toBe(false);
     expect(adapter.mountComposerControls(document.createElement("div"))).toBe(
       false,
     );
+  });
+
+  it("anchors outside a compact outer composer surface when it extends left of the form", () => {
+    const form = document.querySelector("form")!;
+    const surface = form.parentElement!;
+    const actionButton = document.querySelector("#actions button")!;
+    setRect(form, rect(120, 20, 700, 52));
+    setRect(surface, rect(72, 20, 748, 52));
+    setRect(actionButton, rect(127, 24, 44, 44));
+
+    const control = document.createElement("div");
+    expect(adapter.mountComposerControls(control)).toBe(true);
+    expect(control.parentElement).toBe(document.body);
+    expect(control.style.left).toBe("40px");
+    expect(control.style.top).toBe("34px");
+    expect(control.hidden).toBe(false);
   });
 
   it("falls back to the composer field when the previous native slot has no rendered action button", () => {
@@ -73,7 +89,7 @@ describe("ChatGptDomAdapter", () => {
 
     const control = document.createElement("div");
     expect(adapter.mountComposerControls(control)).toBe(true);
-    expect(control.parentElement).toBe(form);
+    expect(control.parentElement).toBe(document.body);
     expect(control.style.left).toBe("8px");
     expect(control.style.top).toBe("14px");
     expect(control.hidden).toBe(false);

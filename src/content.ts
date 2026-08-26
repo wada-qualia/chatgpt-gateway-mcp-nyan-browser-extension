@@ -140,12 +140,13 @@ function buildActionControls(
 }
 
 function reconcile(): void {
-  if (adapter.probeCompatibility().composer) {
-    const existing = document.querySelector<HTMLElement>(
-      '[data-atlas-extension-root="composer"]',
-    );
-    if (existing) adapter.positionComposerControls(existing);
-    else adapter.mountComposerControls(buildComposerControls());
+  const existingComposerControls = document.querySelector<HTMLElement>(
+    '[data-atlas-extension-root="composer"]',
+  );
+  if (existingComposerControls) {
+    adapter.positionComposerControls(existingComposerControls);
+  } else if (adapter.probeCompatibility().composer) {
+    adapter.mountComposerControls(buildComposerControls());
   }
   for (const message of adapter.assistantMessages()) {
     if (message.querySelector('[data-atlas-extension-root="message-actions"]'))

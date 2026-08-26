@@ -5,6 +5,9 @@ export type Compatibility = {
 };
 
 const COMPOSER_CONTROL_SIZE_PX = 24;
+const COMPOSER_CONTROL_GAP_PX = 8;
+const COMPOSER_SURFACE_MAX_EXTRA_WIDTH_PX = 192;
+const COMPOSER_SURFACE_MAX_EXTRA_HEIGHT_PX = 16;
 
 function visible(element: Element): boolean {
   if (!(element instanceof HTMLElement)) return false;
@@ -33,6 +36,33 @@ export class ChatGptDomAdapter {
     ].filter(visible);
     const unique = [...new Set(candidates)];
     return unique.length === 1 ? (unique[0] ?? null) : null;
+  }
+
+  private composerSurfaceRect(form: HTMLFormElement): DOMRect {
+    const formRect = form.getBoundingClientRect();
+    let surfaceRect = formRect;
+    let ancestor = form.parentElement;
+    for (let depth = 0; ancestor && depth < 3; depth += 1) {
+      if (!rendered(ancestor)) break;
+      const rect = ancestor.getBoundingClientRect();
+      const extraWidth = rect.width - formRect.width;
+      const extraHeight = rect.height - formRect.height;
+      if (
+        extraWidth < 0 ||
+        extraHeight < 0 ||
+        extraWidth > COMPOSER_SURFACE_MAX_EXTRA_WIDTH_PX ||
+        extraHeight > COMPOSER_SURFACE_MAX_EXTRA_HEIGHT_PX ||
+        rect.top > formRect.top + 8 ||
+        rect.bottom < formRect.bottom - 8
+      ) {
+        break;
+      }
+      if (rect.left <= surfaceRect.left && rect.right >= surfaceRect.right) {
+        surfaceRect = rect;
+      }
+      ancestor = ancestor.parentElement;
+    }
+    return surfaceRect;
   }
 
   probeCompatibility(root: ParentNode = document): Compatibility {
@@ -110,8 +140,9 @@ export class ChatGptDomAdapter {
         anchorRect = actionButtons[0]!.getBoundingClientRect();
       }
     }
-    const formRect = form.getBoundingClientRect();
-    const left = formRect.left - COMPOSER_CONTROL_SIZE_PX - 8;
+    const surfaceRect = this.composerSurfaceRect(form);
+    const left =
+      surfaceRect.left - COMPOSER_CONTROL_SIZE_PX - COMPOSER_CONTROL_GAP_PX;
     const top =
       anchorRect.top + (anchorRect.height - COMPOSER_CONTROL_SIZE_PX) / 2;
     if (
@@ -136,11 +167,16 @@ export class ChatGptDomAdapter {
     const composer = this.resolveComposer(root);
     if (!composer) return false;
     const form = composer.closest("form");
-    if (!form || form.querySelector('[data-atlas-extension-root="composer"]'))
+    const ownerDocument = composer.ownerDocument;
+    if (
+      !form ||
+      !ownerDocument.body ||
+      ownerDocument.querySelector('[data-atlas-extension-root="composer"]')
+    )
       return false;
     if (!this.positionComposerControls(control, root)) return false;
     control.dataset.atlasExtensionRoot = "composer";
-    form.append(control);
+    ownerDocument.body.append(control);
     return true;
   }
 
