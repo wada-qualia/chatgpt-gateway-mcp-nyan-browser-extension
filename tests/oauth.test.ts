@@ -94,6 +94,48 @@ describe("BrowserOAuthClient", () => {
     });
   });
 
+  it("keeps the browser-global receiver when using native fetch", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = function (
+      this: unknown,
+      input: RequestInfo | URL,
+    ): Promise<Response> {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      if (!(input instanceof URL)) throw new Error("expected URL request");
+      expect(input.toString()).toBe(`${gatewayOrigin}/oauth/token`);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            access_token: "access-token",
+            token_type: "Bearer",
+            expires_in: EXTENSION_ACCESS_TOKEN_TTL_SECONDS,
+            scope: EXTENSION_SCOPE,
+          }),
+          { status: 200 },
+        ),
+      );
+    } as typeof fetch;
+    try {
+      const client = new BrowserOAuthClient(gatewayOrigin, {
+        getRedirectUrl: () => EXTENSION_REDIRECT_URI,
+        launchWebAuthFlow: (loginUrl) => {
+          const authorize = authorizeFromLogin(loginUrl);
+          const state = authorize.searchParams.get("state");
+          return Promise.resolve(
+            `${EXTENSION_REDIRECT_URI}?code=authorization-code&state=${encodeURIComponent(state!)}`,
+          );
+        },
+        now: () => 10_000,
+      });
+
+      await expect(client.login()).resolves.toMatchObject({
+        accessToken: "access-token",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("rejects a redirect URI that is not pinned to the deterministic extension ID", async () => {
     const launchWebAuthFlow = vi.fn();
     const client = new BrowserOAuthClient(gatewayOrigin, {

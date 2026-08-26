@@ -27,6 +27,28 @@ describe("GatewayClient", () => {
     expect(result.status).toBe(200);
   });
 
+  it("keeps the browser-global receiver when using native fetch", async () => {
+    const { manifest } = await promptFixture();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = function (this: unknown): Promise<Response> {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(
+        new Response(JSON.stringify(manifest), {
+          status: 200,
+          headers: { ETag: manifest.etag },
+        }),
+      );
+    } as typeof fetch;
+    try {
+      const client = new GatewayClient("https://gateway.example.test", "token");
+      await expect(client.getManifest("dev", null)).resolves.toMatchObject({
+        status: 200,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("preserves 304 and fail-closed revocation status", async () => {
     const responses = [
       new Response(null, { status: 304 }),

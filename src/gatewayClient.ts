@@ -1,3 +1,4 @@
+import { browserFetch } from "./browserFetch";
 import type { PromptBundle, PromptManifest } from "./types";
 
 export type GatewayResult<T> =
@@ -70,7 +71,7 @@ export class GatewayClient {
   constructor(
     private readonly baseUrl: string,
     private readonly accessToken: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = browserFetch,
   ) {
     const parsed = new URL(baseUrl);
     if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {

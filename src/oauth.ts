@@ -1,3 +1,5 @@
+import { browserFetch } from "./browserFetch";
+
 export const EXTENSION_CLIENT_ID = "atlas-chatgpt-browser-extension";
 export const EXTENSION_SCOPE = "workspace:read";
 export const EXTENSION_REDIRECT_URI =
@@ -152,7 +154,7 @@ export class BrowserOAuthClient {
       (() => chrome.identity.getRedirectURL("oauth2"));
     this.launchWebAuthFlow =
       dependencies.launchWebAuthFlow ?? launchChromeWebAuthFlow;
-    this.fetcher = dependencies.fetcher ?? fetch;
+    this.fetcher = dependencies.fetcher ?? browserFetch;
     this.now = dependencies.now ?? Date.now;
   }
 
