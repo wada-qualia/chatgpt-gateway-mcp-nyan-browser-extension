@@ -62,6 +62,23 @@ describe("ChatGptDomAdapter", () => {
     );
   });
 
+  it("falls back to the composer field when the previous native slot has no rendered action button", () => {
+    document
+      .querySelector("#actions")
+      ?.replaceChildren(document.createElement("input"));
+    const form = document.querySelector("form")!;
+    const composerField = document.querySelector("#primary")!;
+    setRect(form, rect(40, 0, 700, 52));
+    setRect(composerField, rect(47, 8, 666, 36));
+
+    const control = document.createElement("div");
+    expect(adapter.mountComposerControls(control)).toBe(true);
+    expect(control.parentElement).toBe(form);
+    expect(control.style.left).toBe("8px");
+    expect(control.style.top).toBe("14px");
+    expect(control.hidden).toBe(false);
+  });
+
   it("fails closed when the native action anchor is ambiguous or the gutter is too narrow", () => {
     document
       .querySelector("#actions")

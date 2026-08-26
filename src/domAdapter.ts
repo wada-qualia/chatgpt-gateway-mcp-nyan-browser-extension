@@ -97,22 +97,23 @@ export class ChatGptDomAdapter {
       return false;
     }
     const actionField = composerField.previousElementSibling;
-    if (!(actionField instanceof HTMLElement) || !visible(actionField)) {
-      control.hidden = true;
-      return false;
+    let anchorRect = composerField.getBoundingClientRect();
+    if (actionField instanceof HTMLElement && visible(actionField)) {
+      const actionButtons = [
+        ...actionField.querySelectorAll<HTMLButtonElement>("button"),
+      ].filter(rendered);
+      if (actionButtons.length > 1) {
+        control.hidden = true;
+        return false;
+      }
+      if (actionButtons.length === 1) {
+        anchorRect = actionButtons[0]!.getBoundingClientRect();
+      }
     }
-    const actionButtons = [
-      ...actionField.querySelectorAll<HTMLButtonElement>("button"),
-    ].filter(rendered);
-    if (actionButtons.length !== 1) {
-      control.hidden = true;
-      return false;
-    }
-    const actionRect = actionButtons[0]!.getBoundingClientRect();
     const formRect = form.getBoundingClientRect();
     const left = formRect.left - COMPOSER_CONTROL_SIZE_PX - 8;
     const top =
-      actionRect.top + (actionRect.height - COMPOSER_CONTROL_SIZE_PX) / 2;
+      anchorRect.top + (anchorRect.height - COMPOSER_CONTROL_SIZE_PX) / 2;
     if (
       left < 0 ||
       top < 0 ||
