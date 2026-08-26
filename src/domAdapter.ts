@@ -4,10 +4,24 @@ export type Compatibility = {
   strategy: string;
 };
 
+const COMPOSER_CONTROL_SIZE_PX = 24;
+
 function visible(element: Element): boolean {
   if (!(element instanceof HTMLElement)) return false;
   const style = getComputedStyle(element);
   return style.display !== "none" && style.visibility !== "hidden";
+}
+
+function rendered(element: Element): boolean {
+  if (!visible(element)) return false;
+  if (typeof element.checkVisibility === "function") {
+    if (
+      !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+    )
+      return false;
+  }
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
 }
 
 export class ChatGptDomAdapter {
@@ -56,6 +70,64 @@ export class ChatGptDomAdapter {
     return true;
   }
 
+  positionComposerControls(
+    control: HTMLElement,
+    root: ParentNode = document,
+  ): boolean {
+    const composer = this.resolveComposer(root);
+    if (!composer) {
+      control.hidden = true;
+      return false;
+    }
+    const form = composer.closest("form");
+    if (!form) {
+      control.hidden = true;
+      return false;
+    }
+    let composerField: HTMLElement | null = composer.parentElement;
+    while (composerField && composerField.parentElement !== form) {
+      if (composerField === form) {
+        composerField = null;
+        break;
+      }
+      composerField = composerField.parentElement;
+    }
+    if (!composerField) {
+      control.hidden = true;
+      return false;
+    }
+    const actionField = composerField.previousElementSibling;
+    if (!(actionField instanceof HTMLElement) || !visible(actionField)) {
+      control.hidden = true;
+      return false;
+    }
+    const actionButtons = [
+      ...actionField.querySelectorAll<HTMLButtonElement>("button"),
+    ].filter(rendered);
+    if (actionButtons.length !== 1) {
+      control.hidden = true;
+      return false;
+    }
+    const actionRect = actionButtons[0]!.getBoundingClientRect();
+    const formRect = form.getBoundingClientRect();
+    const left = formRect.left - COMPOSER_CONTROL_SIZE_PX - 8;
+    const top =
+      actionRect.top + (actionRect.height - COMPOSER_CONTROL_SIZE_PX) / 2;
+    if (
+      left < 0 ||
+      top < 0 ||
+      left + COMPOSER_CONTROL_SIZE_PX > window.innerWidth ||
+      top + COMPOSER_CONTROL_SIZE_PX > window.innerHeight
+    ) {
+      control.hidden = true;
+      return false;
+    }
+    control.style.left = `${Math.round(left)}px`;
+    control.style.top = `${Math.round(top)}px`;
+    control.hidden = false;
+    return true;
+  }
+
   mountComposerControls(
     control: HTMLElement,
     root: ParentNode = document,
@@ -65,6 +137,7 @@ export class ChatGptDomAdapter {
     const form = composer.closest("form");
     if (!form || form.querySelector('[data-atlas-extension-root="composer"]'))
       return false;
+    if (!this.positionComposerControls(control, root)) return false;
     control.dataset.atlasExtensionRoot = "composer";
     form.append(control);
     return true;

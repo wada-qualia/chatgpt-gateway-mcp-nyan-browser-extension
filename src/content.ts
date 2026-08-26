@@ -26,17 +26,26 @@ function buildComposerControls(): HTMLElement {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "atlas-extension-toggle";
-  toggle.textContent = "ATLAS";
+  toggle.textContent = "A";
+  toggle.title = "ATLAS";
   toggle.setAttribute("aria-label", "Open ATLAS workflow prompts");
+  toggle.setAttribute("aria-haspopup", "menu");
+  toggle.setAttribute("aria-expanded", "false");
   const menu = document.createElement("div");
   menu.className = "atlas-extension-options";
+  menu.setAttribute("role", "menu");
   menu.hidden = true;
+  const setMenuOpen = (open: boolean): void => {
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+  };
   for (const [label, promptId] of promptModes) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;
+    button.setAttribute("role", "menuitem");
     button.addEventListener("click", () => {
-      menu.hidden = true;
+      setMenuOpen(false);
       void insertPrompt(promptId);
     });
     menu.append(button);
@@ -44,7 +53,9 @@ function buildComposerControls(): HTMLElement {
 
   const authButton = document.createElement("button");
   authButton.type = "button";
+  authButton.className = "atlas-extension-auth";
   authButton.dataset.atlasAuthControl = "true";
+  authButton.setAttribute("role", "menuitem");
 
   const refreshAuthButton = async (): Promise<void> => {
     const status = await runtime({ type: "auth:get-status" });
@@ -73,7 +84,7 @@ function buildComposerControls(): HTMLElement {
         authButton.title = result.error;
         return;
       }
-      menu.hidden = true;
+      setMenuOpen(false);
       await refreshAuthButton();
     })();
   });
@@ -81,7 +92,11 @@ function buildComposerControls(): HTMLElement {
   void refreshAuthButton();
 
   toggle.addEventListener("click", () => {
-    menu.hidden = !menu.hidden;
+    if (!adapter.positionComposerControls(root)) {
+      setMenuOpen(false);
+      return;
+    }
+    setMenuOpen(menu.hidden);
   });
   root.append(toggle, menu);
   return root;
@@ -126,7 +141,11 @@ function buildActionControls(
 
 function reconcile(): void {
   if (adapter.probeCompatibility().composer) {
-    adapter.mountComposerControls(buildComposerControls());
+    const existing = document.querySelector<HTMLElement>(
+      '[data-atlas-extension-root="composer"]',
+    );
+    if (existing) adapter.positionComposerControls(existing);
+    else adapter.mountComposerControls(buildComposerControls());
   }
   for (const message of adapter.assistantMessages()) {
     if (message.querySelector('[data-atlas-extension-root="message-actions"]'))
@@ -155,4 +174,5 @@ new MutationObserver(scheduleReconcile).observe(document.documentElement, {
   subtree: true,
 });
 window.addEventListener("popstate", scheduleReconcile);
+window.addEventListener("resize", scheduleReconcile);
 scheduleReconcile();
