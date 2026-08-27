@@ -100,6 +100,22 @@ export class ChatGptDomAdapter {
     return true;
   }
 
+  composerText(root: ParentNode = document): string | null {
+    const composer = this.resolveComposer(root);
+    if (!composer) return null;
+    if (composer instanceof HTMLTextAreaElement) return composer.value;
+    return composer.textContent ?? "";
+  }
+
+  isEmptyConversation(root: ParentNode = document): boolean {
+    const composerText = this.composerText(root);
+    if (composerText === null || composerText.trim().length > 0) return false;
+    return (
+      root.querySelector('[data-message-author-role="user"]') === null &&
+      root.querySelector('[data-message-author-role="assistant"]') === null
+    );
+  }
+
   positionComposerControls(
     control: HTMLElement,
     root: ParentNode = document,

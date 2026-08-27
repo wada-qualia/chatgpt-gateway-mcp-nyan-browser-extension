@@ -126,4 +126,23 @@ describe("ChatGptDomAdapter", () => {
       adapter.mountMessageActions(message, document.createElement("div")),
     ).toBe(false);
   });
+
+  it("prefills project bootstrap only when the chat and composer are empty", () => {
+    document.querySelector('[data-message-author-role="assistant"]')?.remove();
+    expect(adapter.isEmptyConversation()).toBe(true);
+    expect(adapter.composerText()).toBe("");
+
+    expect(adapter.insertComposerText("draft")).toBe(true);
+    expect(adapter.isEmptyConversation()).toBe(false);
+
+    const composer = adapter.resolveComposer() as HTMLTextAreaElement;
+    composer.value = "";
+    document
+      .querySelector("main")
+      ?.insertAdjacentHTML(
+        "beforeend",
+        '<article data-message-author-role="user">Existing turn</article>',
+      );
+    expect(adapter.isEmptyConversation()).toBe(false);
+  });
 });

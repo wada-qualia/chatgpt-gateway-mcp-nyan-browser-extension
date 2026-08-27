@@ -9,9 +9,10 @@
   "packageManager": "npm@10.9.4",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:unpacked": "node scripts/build-unpacked.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint src tests && node --check scripts/build.mjs && node --check scripts/validate-manifest.mjs && node --check scripts/generate-sbom.mjs && node --check scripts/generate-provenance.mjs",
+    "lint": "eslint src tests && node --check scripts/build.mjs && node --check scripts/build-unpacked.mjs && node --check scripts/validate-manifest.mjs && node --check scripts/generate-sbom.mjs && node --check scripts/generate-provenance.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

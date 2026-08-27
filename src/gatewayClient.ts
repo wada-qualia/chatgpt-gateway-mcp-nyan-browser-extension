@@ -1,5 +1,5 @@
 import { browserFetch } from "./browserFetch";
-import type { PromptBundle, PromptManifest } from "./types";
+import type { AuthProfile, PromptBundle, PromptManifest } from "./types";
 
 export type GatewayResult<T> =
   | { status: 200; body: T; etag: string }
@@ -67,6 +67,20 @@ export function parseBundle(value: unknown): PromptBundle {
   return x as PromptBundle;
 }
 
+export function parseUserInfo(value: unknown): AuthProfile {
+  if (value === null || typeof value !== "object")
+    throw new Error("invalid Gateway userinfo response");
+  const username = (value as Record<string, unknown>).preferred_username;
+  if (
+    typeof username !== "string" ||
+    !username.trim() ||
+    username.length > 256
+  ) {
+    throw new Error("invalid Gateway userinfo response");
+  }
+  return { displayName: username.trim() };
+}
+
 export class GatewayClient {
   constructor(
     private readonly baseUrl: string,
@@ -79,14 +93,16 @@ export class GatewayClient {
     }
   }
 
+  private authorizationHeaders(): Headers {
+    return new Headers({ Authorization: `Bearer ${this.accessToken}` });
+  }
+
   private async get<T>(
     path: string,
     etag: string | null,
     parse: (value: unknown) => T,
   ): Promise<GatewayResult<T>> {
-    const headers = new Headers({
-      Authorization: `Bearer ${this.accessToken}`,
-    });
+    const headers = this.authorizationHeaders();
     if (etag) headers.set("If-None-Match", etag);
     const response = await this.fetcher(new URL(path, this.baseUrl), {
       method: "GET",
@@ -104,6 +120,23 @@ export class GatewayClient {
     if (!responseEtag) throw new Error("Gateway response missing ETag");
     const body = parse((await response.json()) as unknown);
     return { status: 200, body, etag: responseEtag };
+  }
+
+  async getUserInfo(): Promise<AuthProfile | null> {
+    const response = await this.fetcher(
+      new URL("/oauth/userinfo", this.baseUrl),
+      {
+        method: "GET",
+        headers: this.authorizationHeaders(),
+        credentials: "omit",
+        cache: "no-store",
+      },
+    );
+    if (response.status === 401) return null;
+    if (response.status !== 200) {
+      throw new Error(`unexpected Gateway userinfo status ${response.status}`);
+    }
+    return parseUserInfo((await response.json()) as unknown);
   }
 
   getManifest(

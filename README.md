@@ -17,7 +17,7 @@ The content script runs in the isolated world. Gateway bearer credentials are co
 
 ## Authentication
 
-The ATLAS menu exposes explicit **Sign in** / **Sign out** controls. Sign in is always initiated by a user click and stays in the service worker: it resolves the exact Chromium redirect with `chrome.identity.getRedirectURL("oauth2")`, verifies that it equals the pinned redirect above, generates high-entropy `state` and an S256 PKCE verifier/challenge, resumes the Gateway `/oauth/authorize` request through `/auth/login`, validates callback origin/path/state, and exchanges the code at `/oauth/token` as a public client without a `client_secret`.
+The ATLAS menu exposes an explicit **Sign in** control when unauthenticated. After authentication it shows the Gateway `preferred_username` next to a user icon; clicking that profile opens a nested account menu containing **Sign out**. The display name is read through Gateway `/oauth/userinfo` by the service worker and is not persisted by the extension. Sign in is always initiated by a user click and stays in the service worker: it resolves the exact Chromium redirect with `chrome.identity.getRedirectURL("oauth2")`, verifies that it equals the pinned redirect above, generates high-entropy `state` and an S256 PKCE verifier/challenge, resumes the Gateway `/oauth/authorize` request through `/auth/login`, validates callback origin/path/state, and exchanges the code at `/oauth/token` as a public client without a `client_secret`.
 
 Only the bearer access token, expiry timestamp and `workspace:read` scope are stored in `chrome.storage.session`. Expired, legacy or wrong-scope tokens fail closed and are removed. No bearer value is returned to the content script or written to DOM/page JavaScript. Sign out clears the session token locally; the Gateway access token is additionally bounded by the one-hour browser-client TTL.
 
@@ -32,7 +32,11 @@ It performs explicit ETag revalidation, verifies per-prompt and aggregate SHA-25
 
 ## User interaction
 
-The content script mounts extension-owned controls next to a uniquely resolved composer. Takeoff, Plan, Phases and Current phase insert prompt text but never send automatically. Assistant `atlas-actions` blocks are treated as untrusted model output and only allow `compose`, `copy_prompt`, and native-DOM `branch_and_compose` after schema validation and an explicit click. DOM ambiguity fails closed.
+The content script mounts extension-owned controls next to a uniquely resolved composer. Takeoff, Plan, Phases and Current phase insert prompt text but never send automatically. The prompt menu closes on outside click and `Escape`. Authenticated users are represented by a profile row with a nested sign-out menu instead of a direct logout action.
+
+Settings opens an extension-owned full-screen overlay where the user can maintain one or more local development projects, select any subset, and edit the project bootstrap prompt. Project names, selection state and the bootstrap template stay in `chrome.storage.local`. A selected-project bootstrap is automatically inserted only when ChatGPT exposes a unique empty composer and there are no existing user/assistant messages; the extension never auto-sends it and never overwrites existing composer or conversation state. Each composer is bootstrapped at most once so manually clearing the draft does not cause immediate re-insertion. The supported template placeholder is `{{projects}}`. Hidden/private ChatGPT system prompts are intentionally not used because they would cross the documented ChatGPT ownership boundary.
+
+Assistant `atlas-actions` blocks are treated as untrusted model output and only allow `compose`, `copy_prompt`, and native-DOM `branch_and_compose` after schema validation and an explicit click. DOM ambiguity fails closed.
 
 ## Development
 
@@ -46,6 +50,14 @@ npm run package
 node scripts/generate-sbom.mjs
 node scripts/generate-provenance.mjs
 ```
+
+For a controlled unpacked Chrome installation, build into one stable reload directory instead of a per-worktree `dist` path:
+
+```bash
+ATLAS_GATEWAY_ORIGIN=https://gateway.example.com ATLAS_PROMPT_CHANNEL=dev npm run build:unpacked
+```
+
+By default `build:unpacked` resolves the repository's primary Git worktree and atomically refreshes `<primary-worktree>/.atlas-unpacked/chatgpt-mcp-browser-extension`. Load that directory once with Chrome **Load unpacked**; subsequent builds keep the same path, so Chrome's **Reload** button is sufficient. `ATLAS_BUILD_INFO.json` records the source `HEAD`, extension version and `working_tree_dirty`; a clean build therefore has an exact source-SHA receipt while a development build is explicitly marked dirty. The stable unpacked directory is ignored by Git and is not a release source of truth. `ATLAS_UNPACKED_DIR` may override the target only for an explicitly controlled local install.
 
 Set `ATLAS_GATEWAY_ORIGIN` to the approved exact HTTPS Gateway origin when producing a build that may contact Gateway, and optionally set `ATLAS_PROMPT_CHANNEL` (default `dev`). The build injects the origin into both the service-worker runtime configuration and the exact matching `host_permissions` entry; it rejects non-HTTPS/non-origin values and invalid channel names. The accepted current public Gateway origin is `https://gateway.example.com`, but it is intentionally not an implicit build default: networking remains an explicit build-time opt-in.
 

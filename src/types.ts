@@ -1,3 +1,5 @@
+import type { ExtensionSettings } from "./settings";
+
 export type PromptManifest = {
   schema_version: 1;
   channel: string;
@@ -51,12 +53,19 @@ export type AtlasActionsEnvelope = {
   actions: AtlasAction[];
 };
 
+export type AuthProfile = {
+  displayName: string;
+};
+
 export type RuntimeRequest =
   | { type: "prompt:get"; promptId: string }
   | { type: "prompt:refresh" }
   | { type: "auth:get-status" }
+  | { type: "auth:get-profile" }
   | { type: "auth:login" }
-  | { type: "auth:logout" };
+  | { type: "auth:logout" }
+  | { type: "settings:get" }
+  | { type: "settings:update"; settings: ExtensionSettings };
 
 export type RuntimeResponse =
   | { ok: true; value: unknown }
