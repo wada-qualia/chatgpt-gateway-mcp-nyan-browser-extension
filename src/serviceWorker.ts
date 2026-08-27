@@ -6,6 +6,7 @@ import {
   type OAuthSessionToken,
 } from "./oauth";
 import { PromptRepository } from "./promptRepository";
+import { EXTENSION_SETTINGS_KEY, parseExtensionSettings } from "./settings";
 import type { RuntimeRequest, RuntimeResponse } from "./types";
 
 declare const __ATLAS_GATEWAY_ORIGIN__: string;
@@ -53,10 +54,31 @@ async function loadRepository(): Promise<PromptRepository> {
   );
 }
 
+async function loadSettings(): Promise<
+  ReturnType<typeof parseExtensionSettings>
+> {
+  const local = await chrome.storage.local.get(EXTENSION_SETTINGS_KEY);
+  return parseExtensionSettings(local[EXTENSION_SETTINGS_KEY]);
+}
+
 async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
   try {
     if (request.type === "auth:get-status") {
       return { ok: true, value: Boolean(await loadSessionToken()) };
+    }
+    if (request.type === "auth:get-profile") {
+      const token = await loadSessionToken();
+      if (!token) return { ok: true, value: null };
+      const config = await loadGatewayConfig();
+      const profile = await new GatewayClient(
+        config.baseUrl,
+        token.accessToken,
+      ).getUserInfo();
+      if (!profile) {
+        await chrome.storage.session.remove(TOKEN_KEY);
+        return { ok: true, value: null };
+      }
+      return { ok: true, value: profile };
     }
     if (request.type === "auth:login") {
       const config = await loadGatewayConfig();
@@ -67,6 +89,14 @@ async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
     if (request.type === "auth:logout") {
       await chrome.storage.session.remove(TOKEN_KEY);
       return { ok: true, value: false };
+    }
+    if (request.type === "settings:get") {
+      return { ok: true, value: await loadSettings() };
+    }
+    if (request.type === "settings:update") {
+      const settings = parseExtensionSettings(request.settings);
+      await chrome.storage.local.set({ [EXTENSION_SETTINGS_KEY]: settings });
+      return { ok: true, value: settings };
     }
     const repository = await loadRepository();
     if (request.type === "prompt:refresh") {

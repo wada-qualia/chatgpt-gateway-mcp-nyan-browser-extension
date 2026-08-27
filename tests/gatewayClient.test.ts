@@ -73,4 +73,43 @@ describe("GatewayClient", () => {
       parseManifest({ ...manifest, bundle_id: "b".repeat(64) }),
     ).toThrow("invalid manifest");
   });
+
+  it("reads the authenticated username through Gateway userinfo without exposing the token", async () => {
+    const fetcher = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("Authorization")).toBe("Bearer token");
+      expect(init?.credentials).toBe("omit");
+      expect(init?.cache).toBe("no-store");
+      return Promise.resolve(
+        new Response(JSON.stringify({ preferred_username: "gateway-admin" }), {
+          status: 200,
+        }),
+      );
+    });
+    const client = new GatewayClient(
+      "https://gateway.example.test",
+      "token",
+      fetcher as typeof fetch,
+    );
+    await expect(client.getUserInfo()).resolves.toEqual({
+      displayName: "gateway-admin",
+    });
+  });
+
+  it("fails closed on expired or malformed Gateway userinfo", async () => {
+    const responses = [
+      new Response(null, { status: 401 }),
+      new Response(JSON.stringify({ preferred_username: "" }), { status: 200 }),
+    ];
+    const fetcher = vi.fn(() => Promise.resolve(responses.shift()!));
+    const client = new GatewayClient(
+      "https://gateway.example.test",
+      "token",
+      fetcher as typeof fetch,
+    );
+    await expect(client.getUserInfo()).resolves.toBeNull();
+    await expect(client.getUserInfo()).rejects.toThrow(
+      "invalid Gateway userinfo response",
+    );
+  });
 });

@@ -126,4 +126,55 @@ describe("ChatGptDomAdapter", () => {
       adapter.mountMessageActions(message, document.createElement("div")),
     ).toBe(false);
   });
+
+  it("prefills project bootstrap only when the chat and composer are empty", () => {
+    document.querySelector('[data-message-author-role="assistant"]')?.remove();
+    expect(adapter.isEmptyConversation()).toBe(true);
+    expect(adapter.composerText()).toBe("");
+
+    expect(adapter.insertComposerText("draft")).toBe(true);
+    expect(adapter.isEmptyConversation()).toBe(false);
+
+    const composer = adapter.resolveComposer() as HTMLTextAreaElement;
+    composer.value = "";
+    document
+      .querySelector("main")
+      ?.insertAdjacentHTML(
+        "beforeend",
+        '<article data-message-author-role="user">Existing turn</article>',
+      );
+    expect(adapter.isEmptyConversation()).toBe(false);
+  });
+
+  it("discovers only native ChatGPT project roots rendered in the sidebar", () => {
+    document.body.insertAdjacentHTML(
+      "afterbegin",
+      `<aside id="sidebar">
+        <a href="/g/g-p-11111111111111111111111111111111-gateway-pilot/project"><span>Gateway Pilot</span></a>
+        <a href="/g/g-p-22222222222222222222222222222222-extension-pilot/project">  Extension   Pilot  </a>
+        <a href="/g/g-p-11111111111111111111111111111111-gateway-pilot/c/abc">Project chat</a>
+        <a href="/g/g-custom-gpt">Custom GPT</a>
+        <a href="/g/g-p-33333333333333333333333333333333-hidden/project" style="display:none">Hidden Project</a>
+      </aside>
+      <main id="project-main-link"><a href="/g/g-p-44444444444444444444444444444444-main/project">Main Project Link</a></main>`,
+    );
+    for (const anchor of document.querySelectorAll("#sidebar a")) {
+      setRect(anchor, rect(20, 20, 240, 36));
+    }
+    const mainLink = document.querySelector("#project-main-link a")!;
+    setRect(mainLink, rect(520, 20, 240, 36));
+
+    expect(adapter.nativeProjects()).toEqual([
+      {
+        id: "g-p-11111111111111111111111111111111",
+        name: "Gateway Pilot",
+        href: "/g/g-p-11111111111111111111111111111111-gateway-pilot/project",
+      },
+      {
+        id: "g-p-22222222222222222222222222222222",
+        name: "Extension Pilot",
+        href: "/g/g-p-22222222222222222222222222222222-extension-pilot/project",
+      },
+    ]);
+  });
 });
