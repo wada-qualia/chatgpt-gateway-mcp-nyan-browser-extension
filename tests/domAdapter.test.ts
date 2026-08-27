@@ -48,8 +48,8 @@ describe("ChatGptDomAdapter", () => {
   it("mounts composer controls out of layout in the left composer gutter", () => {
     const form = document.querySelector("form")!;
     const actionButton = document.querySelector("#actions button")!;
-    setRect(form, rect(40, 0, 700, 52));
-    setRect(actionButton, rect(47, 4, 44, 44));
+    setRect(form, rect(80, 20, 700, 52));
+    setRect(actionButton, rect(87, 24, 44, 44));
 
     const control = document.createElement("div");
     expect(adapter.mountComposerControls(control)).toBe(true);
@@ -66,9 +66,9 @@ describe("ChatGptDomAdapter", () => {
     const form = document.querySelector("form")!;
     const surface = form.parentElement!;
     const actionButton = document.querySelector("#actions button")!;
-    setRect(form, rect(120, 20, 700, 52));
-    setRect(surface, rect(72, 20, 748, 52));
-    setRect(actionButton, rect(127, 24, 44, 44));
+    setRect(form, rect(160, 40, 700, 52));
+    setRect(surface, rect(112, 40, 748, 52));
+    setRect(actionButton, rect(167, 44, 44, 44));
 
     const control = document.createElement("div");
     expect(adapter.mountComposerControls(control)).toBe(true);
@@ -84,14 +84,27 @@ describe("ChatGptDomAdapter", () => {
       ?.replaceChildren(document.createElement("input"));
     const form = document.querySelector("form")!;
     const composerField = document.querySelector("#primary")!;
-    setRect(form, rect(40, 0, 700, 52));
-    setRect(composerField, rect(47, 8, 666, 36));
+    setRect(form, rect(80, 20, 700, 52));
+    setRect(composerField, rect(87, 28, 666, 36));
 
     const control = document.createElement("div");
     expect(adapter.mountComposerControls(control)).toBe(true);
     expect(control.parentElement).toBe(document.body);
     expect(control.style.left).toBe("8px");
     expect(control.style.top).toBe("14px");
+    expect(control.hidden).toBe(false);
+  });
+
+  it("moves controls to the bottom edge when the composer surface expands", () => {
+    const form = document.querySelector("form")!;
+    const actionButton = document.querySelector("#actions button")!;
+    setRect(form, rect(160, 40, 700, 220));
+    setRect(actionButton, rect(167, 44, 44, 44));
+
+    const control = document.createElement("div");
+    expect(adapter.mountComposerControls(control)).toBe(true);
+    expect(control.style.left).toBe("88px");
+    expect(control.style.top).toBe("194px");
     expect(control.hidden).toBe(false);
   });
 

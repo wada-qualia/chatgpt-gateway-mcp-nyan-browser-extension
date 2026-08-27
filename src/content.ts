@@ -647,7 +647,19 @@ function buildActionControls(
   return root;
 }
 
+let observedComposerForm: HTMLFormElement | null = null;
+const composerResizeObserver = new ResizeObserver(scheduleReconcile);
+
+function syncComposerResizeObserver(): void {
+  const form = adapter.resolveComposer()?.closest("form") ?? null;
+  if (form === observedComposerForm) return;
+  composerResizeObserver.disconnect();
+  observedComposerForm = form;
+  if (form) composerResizeObserver.observe(form);
+}
+
 function reconcile(): void {
+  syncComposerResizeObserver();
   const existingComposerControls = document.querySelector<HTMLElement>(
     '[data-atlas-extension-root="composer"]',
   );
