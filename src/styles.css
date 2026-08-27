@@ -282,7 +282,7 @@
   margin-top: 8px;
 }
 
-.atlas-extension-project-add input,
+.atlas-extension-project-select,
 .atlas-extension-bootstrap-prompt {
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
@@ -292,7 +292,7 @@
   outline: none;
 }
 
-.atlas-extension-project-add input {
+.atlas-extension-project-select {
   min-width: 0;
   flex: 1 1 auto;
   padding: 9px 10px;

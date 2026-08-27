@@ -4,6 +4,12 @@ export type Compatibility = {
   strategy: string;
 };
 
+export type NativeChatGptProject = {
+  id: string;
+  name: string;
+  href: string;
+};
+
 const COMPOSER_CONTROL_SIZE_PX = 24;
 const COMPOSER_CONTROL_GAP_PX = 8;
 const COMPOSER_SURFACE_MAX_EXTRA_WIDTH_PX = 192;
@@ -114,6 +120,49 @@ export class ChatGptDomAdapter {
       root.querySelector('[data-message-author-role="user"]') === null &&
       root.querySelector('[data-message-author-role="assistant"]') === null
     );
+  }
+
+  nativeProjects(root: ParentNode = document): NativeChatGptProject[] {
+    const anchors = [
+      ...root.querySelectorAll<HTMLAnchorElement>('a[href*="/g/g-p-"]'),
+    ].filter(rendered);
+    const sidebarSelectors =
+      'nav, aside, [data-testid*="sidebar" i], [class*="sidebar" i]';
+    const sidebarAnchors = anchors.filter((anchor) =>
+      anchor.closest(sidebarSelectors),
+    );
+    const maxSidebarLeft = Math.min(420, window.innerWidth * 0.45);
+    const candidates =
+      sidebarAnchors.length > 0
+        ? sidebarAnchors
+        : anchors.filter((anchor) => {
+            const rect = anchor.getBoundingClientRect();
+            return rect.left < maxSidebarLeft && rect.width <= 400;
+          });
+    const projects = new Map<string, NativeChatGptProject>();
+    for (const anchor of candidates) {
+      const rawHref = anchor.getAttribute("href");
+      if (!rawHref) continue;
+      let url: URL;
+      try {
+        url = new URL(rawHref, window.location.href);
+      } catch {
+        continue;
+      }
+      if (url.origin !== window.location.origin) continue;
+      const match = url.pathname.match(
+        /^\/g\/(g-p-[A-Za-z0-9]+)(?:-[^/]+)?(?:\/project)?\/?$/u,
+      );
+      const id = match?.[1];
+      if (!id) continue;
+      const name =
+        [anchor.textContent, anchor.title, anchor.getAttribute("aria-label")]
+          .map((value) => (value ?? "").replace(/\s+/gu, " ").trim())
+          .find((value) => value.length > 0) ?? "";
+      if (!name || projects.has(id)) continue;
+      projects.set(id, { id, name, href: `${url.pathname}${url.search}` });
+    }
+    return [...projects.values()];
   }
 
   positionComposerControls(

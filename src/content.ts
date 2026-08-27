@@ -1,7 +1,7 @@
 import { parseAtlasActions } from "./actions";
 import { ChatGptDomAdapter } from "./domAdapter";
 import {
-  MAX_PROJECT_NAME_LENGTH,
+  MAX_PROJECTS,
   defaultExtensionSettings,
   parseExtensionSettings,
   renderBootstrapPrompt,
@@ -250,7 +250,7 @@ function buildComposerControls(): HTMLElement {
   const settingsHint = document.createElement("p");
   settingsHint.className = "atlas-extension-settings-hint";
   settingsHint.textContent =
-    "Choose one or more development projects. Opening them in an empty chat prefills the bootstrap prompt but never sends it automatically.";
+    "Choose one or more projects already visible in the ChatGPT sidebar. Opening them in an empty chat prefills the bootstrap prompt but never sends it automatically.";
 
   const projectsTitle = document.createElement("h3");
   projectsTitle.textContent = "Projects";
@@ -258,13 +258,12 @@ function buildComposerControls(): HTMLElement {
   projectList.className = "atlas-extension-project-list";
   const addProjectRow = document.createElement("div");
   addProjectRow.className = "atlas-extension-project-add";
-  const projectNameInput = document.createElement("input");
-  projectNameInput.type = "text";
-  projectNameInput.maxLength = MAX_PROJECT_NAME_LENGTH;
-  projectNameInput.placeholder = "Project name";
-  projectNameInput.setAttribute("aria-label", "Project name");
+  const projectSelect = document.createElement("select");
+  projectSelect.className = "atlas-extension-project-select";
+  projectSelect.setAttribute("aria-label", "ChatGPT project");
   const addProjectButton = createButton("Add project");
-  addProjectRow.append(projectNameInput, addProjectButton);
+  addProjectButton.disabled = true;
+  addProjectRow.append(projectSelect, addProjectButton);
 
   const promptLabel = document.createElement("label");
   promptLabel.className = "atlas-extension-bootstrap-label";
@@ -306,6 +305,40 @@ function buildComposerControls(): HTMLElement {
   settingsBackdrop.append(settingsDialog);
 
   let settingsDraft: ExtensionSettings = defaultExtensionSettings();
+  let nativeProjectOptions = adapter.nativeProjects();
+
+  const refreshNativeProjectOptions = (): void => {
+    nativeProjectOptions = adapter.nativeProjects();
+    const configuredIds = new Set(
+      settingsDraft.projects.map((project) => project.id),
+    );
+    const configuredNames = new Set(
+      settingsDraft.projects.map((project) => project.name.toLocaleLowerCase()),
+    );
+    const available = nativeProjectOptions.filter(
+      (project) =>
+        !configuredIds.has(project.id) &&
+        !configuredNames.has(project.name.toLocaleLowerCase()),
+    );
+    projectSelect.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    placeholder.textContent =
+      available.length > 0
+        ? "Select a ChatGPT project"
+        : "No unconfigured projects visible in ChatGPT sidebar";
+    projectSelect.append(placeholder);
+    for (const project of available) {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name;
+      projectSelect.append(option);
+    }
+    projectSelect.disabled = available.length === 0;
+    addProjectButton.disabled = true;
+  };
 
   const renderProjectList = (): void => {
     projectList.replaceChildren();
@@ -348,6 +381,7 @@ function buildComposerControls(): HTMLElement {
           ),
         };
         renderProjectList();
+        refreshNativeProjectOptions();
       });
       row.append(label, remove);
       projectList.append(row);
@@ -355,34 +389,44 @@ function buildComposerControls(): HTMLElement {
   };
 
   const addProject = (): void => {
-    const name = projectNameInput.value.trim();
-    if (!name) return;
+    const selectedId = projectSelect.value;
+    const project = nativeProjectOptions.find((item) => item.id === selectedId);
+    if (!project) {
+      settingsStatus.textContent =
+        "Select a project currently visible in the ChatGPT sidebar.";
+      return;
+    }
+    if (settingsDraft.projects.length >= MAX_PROJECTS) {
+      settingsStatus.textContent = `ATLAS supports up to ${MAX_PROJECTS} configured projects.`;
+      return;
+    }
     if (
       settingsDraft.projects.some(
-        (project) =>
-          project.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+        (item) =>
+          item.id === project.id ||
+          item.name.toLocaleLowerCase() === project.name.toLocaleLowerCase(),
       )
     ) {
       settingsStatus.textContent = "That project is already configured.";
+      refreshNativeProjectOptions();
       return;
     }
-    const id = crypto.randomUUID().replaceAll("-", "");
     settingsDraft = {
       ...settingsDraft,
-      projects: [...settingsDraft.projects, { id, name }],
-      selectedProjectIds: [...settingsDraft.selectedProjectIds, id],
+      projects: [
+        ...settingsDraft.projects,
+        { id: project.id, name: project.name },
+      ],
+      selectedProjectIds: [...settingsDraft.selectedProjectIds, project.id],
     };
-    projectNameInput.value = "";
     settingsStatus.textContent = "";
     renderProjectList();
+    refreshNativeProjectOptions();
   };
 
   addProjectButton.addEventListener("click", addProject);
-  projectNameInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addProject();
-    }
+  projectSelect.addEventListener("change", () => {
+    addProjectButton.disabled = projectSelect.value.length === 0;
   });
 
   const loadSettingsIntoDialog = async (): Promise<boolean> => {
@@ -401,6 +445,7 @@ function buildComposerControls(): HTMLElement {
     bootstrapPrompt.value = settingsDraft.bootstrapPrompt;
     settingsStatus.textContent = "";
     renderProjectList();
+    refreshNativeProjectOptions();
     return true;
   };
 
@@ -432,7 +477,7 @@ function buildComposerControls(): HTMLElement {
     void (async () => {
       setSettingsOpen(true);
       await loadSettingsIntoDialog();
-      projectNameInput.focus();
+      projectSelect.focus();
     })();
   });
   settingsClose.addEventListener("click", () => setSettingsOpen(false));
