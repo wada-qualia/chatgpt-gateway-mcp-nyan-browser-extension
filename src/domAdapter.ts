@@ -10,8 +10,10 @@ export type NativeChatGptProject = {
   href: string;
 };
 
-const COMPOSER_CONTROL_SIZE_PX = 24;
+const COMPOSER_CONTROL_SIZE_PX = 64;
 const COMPOSER_CONTROL_GAP_PX = 8;
+const COMPOSER_EXPANDED_MIN_HEIGHT_PX = 96;
+const COMPOSER_EXPANDED_BOTTOM_INSET_PX = 2;
 const COMPOSER_SURFACE_MAX_EXTRA_WIDTH_PX = 192;
 const COMPOSER_SURFACE_MAX_EXTRA_HEIGHT_PX = 16;
 
@@ -208,8 +210,14 @@ export class ChatGptDomAdapter {
     const surfaceRect = this.composerSurfaceRect(form);
     const left =
       surfaceRect.left - COMPOSER_CONTROL_SIZE_PX - COMPOSER_CONTROL_GAP_PX;
-    const top =
+    const centeredTop =
       anchorRect.top + (anchorRect.height - COMPOSER_CONTROL_SIZE_PX) / 2;
+    const top =
+      surfaceRect.height >= COMPOSER_EXPANDED_MIN_HEIGHT_PX
+        ? surfaceRect.bottom -
+          COMPOSER_CONTROL_SIZE_PX -
+          COMPOSER_EXPANDED_BOTTOM_INSET_PX
+        : centeredTop;
     if (
       left < 0 ||
       top < 0 ||
