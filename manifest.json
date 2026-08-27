@@ -19,6 +19,15 @@
       "world": "ISOLATED"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/neko/waiting/*.png",
+        "assets/neko/interesting/*.png"
+      ],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

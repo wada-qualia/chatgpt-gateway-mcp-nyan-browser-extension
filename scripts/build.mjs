@@ -48,6 +48,15 @@ await build({
 });
 
 await cp(resolve(root, "src/styles.css"), resolve(dist, "styles.css"));
+const nekoAssetTarget = resolve(dist, "assets/neko");
+await mkdir(nekoAssetTarget, { recursive: true });
+for (const mood of ["waiting", "interesting"]) {
+  await cp(
+    resolve(root, "src/assets/neko", mood),
+    resolve(nekoAssetTarget, mood),
+    { recursive: true },
+  );
+}
 const manifest = JSON.parse(
   await readFile(resolve(root, "manifest.json"), "utf8"),
 );

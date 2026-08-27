@@ -1,4 +1,5 @@
 import { parseAtlasActions } from "./actions";
+import { pickNekoAsset } from "./assets/neko";
 import { ChatGptDomAdapter } from "./domAdapter";
 import {
   MAX_PROJECTS,
@@ -82,11 +83,95 @@ function createButton(label: string, className?: string): HTMLButtonElement {
   return button;
 }
 
+function createNekoToggle(): HTMLButtonElement {
+  const button = createButton("", "atlas-extension-toggle");
+  const shell = document.createElement("span");
+  shell.className = "atlas-extension-neko-shell";
+  shell.setAttribute("aria-hidden", "true");
+
+  const waitingImage = document.createElement("img");
+  waitingImage.className =
+    "atlas-extension-neko-image atlas-extension-neko-waiting";
+  waitingImage.alt = "";
+  waitingImage.draggable = false;
+  waitingImage.decoding = "async";
+
+  const interestingImage = document.createElement("img");
+  interestingImage.className =
+    "atlas-extension-neko-image atlas-extension-neko-interesting";
+  interestingImage.alt = "";
+  interestingImage.draggable = false;
+  interestingImage.decoding = "async";
+
+  const wave = document.createElement("span");
+  wave.className = "atlas-extension-neko-wave";
+
+  const waitingAsset = pickNekoAsset("waiting");
+  waitingImage.src = chrome.runtime.getURL(waitingAsset);
+  button.dataset.nekoWaitingAsset = waitingAsset;
+
+  let interestingAsset = pickNekoAsset("interesting");
+  const refreshInterestingAsset = (): void => {
+    let nextAsset = pickNekoAsset("interesting");
+    for (
+      let attempt = 0;
+      attempt < 4 && nextAsset === interestingAsset;
+      attempt += 1
+    ) {
+      nextAsset = pickNekoAsset("interesting");
+    }
+    interestingAsset = nextAsset;
+    interestingImage.src = chrome.runtime.getURL(interestingAsset);
+    button.dataset.nekoInterestingAsset = interestingAsset;
+  };
+  interestingImage.src = chrome.runtime.getURL(interestingAsset);
+  button.dataset.nekoInterestingAsset = interestingAsset;
+
+  let pointerActive = false;
+  let focusActive = false;
+  let refreshTimer: number | null = null;
+  const syncActiveState = (): void => {
+    const active = pointerActive || focusActive;
+    button.dataset.nekoActive = String(active);
+    if (active) {
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = null;
+      return;
+    }
+    if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => {
+      refreshInterestingAsset();
+      refreshTimer = null;
+    }, 360);
+  };
+
+  button.addEventListener("pointerenter", () => {
+    pointerActive = true;
+    syncActiveState();
+  });
+  button.addEventListener("pointerleave", () => {
+    pointerActive = false;
+    syncActiveState();
+  });
+  button.addEventListener("focus", () => {
+    focusActive = true;
+    syncActiveState();
+  });
+  button.addEventListener("blur", () => {
+    focusActive = false;
+    syncActiveState();
+  });
+
+  shell.append(waitingImage, interestingImage, wave);
+  button.append(shell);
+  return button;
+}
+
 function buildComposerControls(): HTMLElement {
   const root = document.createElement("div");
   root.className = "atlas-extension-menu";
 
-  const toggle = createButton("A", "atlas-extension-toggle");
+  const toggle = createNekoToggle();
   toggle.title = "ATLAS";
   toggle.setAttribute("aria-label", "Open ATLAS workflow prompts");
   toggle.setAttribute("aria-haspopup", "menu");
