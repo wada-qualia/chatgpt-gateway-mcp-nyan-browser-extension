@@ -5,6 +5,7 @@ import {
   defaultExtensionSettings,
   parseExtensionSettings,
   renderBootstrapPrompt,
+  renderBootstrapPromptForProject,
 } from "../src/settings";
 
 describe("extension settings", () => {
@@ -31,6 +32,23 @@ describe("extension settings", () => {
     expect(renderBootstrapPrompt(settings)).toBe(
       "Projects: ChatGPT Gateway, Browser Extension",
     );
+  });
+
+  it("renders bootstrap only for the current selected project", () => {
+    const settings = parseExtensionSettings({
+      schemaVersion: 1,
+      projects: [
+        { id: "gateway", name: "ChatGPT Gateway" },
+        { id: "extension", name: "Browser Extension" },
+      ],
+      selectedProjectIds: ["gateway"],
+      bootstrapPrompt: "Project: {{projects}}",
+    });
+    expect(renderBootstrapPromptForProject(settings, "gateway")).toBe(
+      "Project: ChatGPT Gateway",
+    );
+    expect(renderBootstrapPromptForProject(settings, "extension")).toBe("");
+    expect(renderBootstrapPromptForProject(settings, "missing")).toBe("");
   });
 
   it("appends selected projects when the placeholder is omitted", () => {

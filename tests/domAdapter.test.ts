@@ -159,6 +159,39 @@ describe("ChatGptDomAdapter", () => {
     expect(adapter.isEmptyConversation()).toBe(false);
   });
 
+  it("classifies only project-root URLs as new project chats", () => {
+    const projectId = "g-p-11111111111111111111111111111111";
+    expect(
+      adapter.currentProjectRoute(
+        `https://chatgpt.com/g/${projectId}-gateway-pilot/project`,
+      ),
+    ).toEqual({ projectId, kind: "new" });
+    expect(
+      adapter.currentProjectRoute(
+        `https://chatgpt.com/g/${projectId}-gateway-pilot`,
+      ),
+    ).toEqual({ projectId, kind: "new" });
+    expect(
+      adapter.currentProjectRoute(
+        `https://chatgpt.com/g/${projectId}-gateway-pilot/c/conversation-123`,
+      ),
+    ).toEqual({ projectId, kind: "conversation" });
+    expect(
+      adapter.currentProjectRoute(
+        `https://chatgpt.com/g/${projectId}-gateway-pilot/project/c/conversation-123`,
+      ),
+    ).toEqual({ projectId, kind: "conversation" });
+    expect(adapter.currentProjectRoute("https://chatgpt.com/")).toBeNull();
+    expect(
+      adapter.currentProjectRoute("https://chatgpt.com/c/conversation-123"),
+    ).toBeNull();
+    expect(
+      adapter.currentProjectRoute(
+        `https://example.com/g/${projectId}-gateway-pilot/project`,
+      ),
+    ).toBeNull();
+  });
+
   it("discovers only native ChatGPT project roots rendered in the sidebar", () => {
     document.body.insertAdjacentHTML(
       "afterbegin",

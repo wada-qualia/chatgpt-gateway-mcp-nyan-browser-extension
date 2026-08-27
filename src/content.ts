@@ -1,11 +1,11 @@
 import { parseAtlasActions } from "./actions";
 import { pickNekoAsset } from "./assets/neko";
+import { bootstrapPromptForRoute } from "./bootstrapPolicy";
 import { ChatGptDomAdapter } from "./domAdapter";
 import {
   MAX_PROJECTS,
   defaultExtensionSettings,
   parseExtensionSettings,
-  renderBootstrapPrompt,
   type ExtensionSettings,
 } from "./settings";
 import type {
@@ -24,7 +24,7 @@ const promptModes: Array<[string, string]> = [
   ["Current phase", "current_phase"],
 ];
 const bootstrapInFlight = new WeakSet<HTMLElement>();
-const bootstrapApplied = new WeakSet<HTMLElement>();
+const bootstrapApplied = new WeakMap<HTMLElement, string>();
 
 async function runtime(request: RuntimeRequest): Promise<RuntimeResponse> {
   return chrome.runtime.sendMessage(request);
@@ -38,28 +38,42 @@ async function insertPrompt(promptId: string): Promise<void> {
 
 async function maybeBootstrapSelectedProjects(): Promise<void> {
   const composer = adapter.resolveComposer();
+  if (!composer) return;
+
+  const route = adapter.currentProjectRoute();
+  if (!route || route.kind !== "new") {
+    bootstrapApplied.delete(composer);
+    return;
+  }
   if (
-    !composer ||
-    bootstrapApplied.has(composer) ||
+    bootstrapApplied.get(composer) === route.projectId ||
     bootstrapInFlight.has(composer) ||
     !adapter.isEmptyConversation()
   ) {
     return;
   }
+
   bootstrapInFlight.add(composer);
   try {
     const result = await runtime({ type: "settings:get" });
     if (!result.ok) return;
     const settings = parseExtensionSettings(result.value);
-    const prompt = renderBootstrapPrompt(settings);
+    const prompt = bootstrapPromptForRoute(settings, route);
     if (!prompt) return;
+
+    const currentRoute = adapter.currentProjectRoute();
     if (
       adapter.resolveComposer() !== composer ||
+      !currentRoute ||
+      currentRoute.kind !== "new" ||
+      currentRoute.projectId !== route.projectId ||
       !adapter.isEmptyConversation()
     ) {
       return;
     }
-    if (adapter.insertComposerText(prompt)) bootstrapApplied.add(composer);
+    if (adapter.insertComposerText(prompt)) {
+      bootstrapApplied.set(composer, route.projectId);
+    }
   } catch {
     // Automatic bootstrap is best-effort and must not interfere with ChatGPT.
   } finally {
@@ -335,7 +349,7 @@ function buildComposerControls(): HTMLElement {
   const settingsHint = document.createElement("p");
   settingsHint.className = "atlas-extension-settings-hint";
   settingsHint.textContent =
-    "Choose one or more projects already visible in the ChatGPT sidebar. Opening them in an empty chat prefills the bootstrap prompt but never sends it automatically.";
+    "Choose one or more projects already visible in the ChatGPT sidebar. The bootstrap prompt is inserted only into a new empty chat whose current project id is selected; existing chats, other projects and chats outside projects are never bootstrapped.";
 
   const projectsTitle = document.createElement("h3");
   projectsTitle.textContent = "Projects";
@@ -576,15 +590,21 @@ function buildComposerControls(): HTMLElement {
     void (async () => {
       const saved = await persistSettings();
       if (!saved) return;
-      const prompt = renderBootstrapPrompt(saved);
+      const route = adapter.currentProjectRoute();
+      if (!route || route.kind !== "new") {
+        settingsStatus.textContent =
+          "Open a new chat inside one of the selected ChatGPT projects. Existing chats and chats outside projects are not bootstrapped.";
+        return;
+      }
+      const prompt = bootstrapPromptForRoute(saved, route);
       if (!prompt) {
         settingsStatus.textContent =
-          "Select at least one project and configure a bootstrap prompt.";
+          "The current ChatGPT project is not selected for bootstrap, or the bootstrap prompt is empty.";
         return;
       }
       if (!adapter.isEmptyConversation()) {
         settingsStatus.textContent =
-          "Open a new empty ChatGPT chat before opening the selected project(s). Existing conversation or composer text will not be overwritten.";
+          "The current project chat is not empty. Existing conversation or composer text will not be overwritten.";
         return;
       }
       const composer = adapter.resolveComposer();
@@ -592,7 +612,7 @@ function buildComposerControls(): HTMLElement {
         settingsStatus.textContent = "ChatGPT composer is not available.";
         return;
       }
-      bootstrapApplied.add(composer);
+      bootstrapApplied.set(composer, route.projectId);
       setSettingsOpen(false);
     })();
   });

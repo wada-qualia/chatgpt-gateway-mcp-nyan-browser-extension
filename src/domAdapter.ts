@@ -10,6 +10,11 @@ export type NativeChatGptProject = {
   href: string;
 };
 
+export type ChatGptProjectRoute = {
+  projectId: string;
+  kind: "new" | "conversation";
+};
+
 const COMPOSER_CONTROL_SIZE_PX = 64;
 const COMPOSER_CONTROL_GAP_PX = 8;
 const COMPOSER_EXPANDED_MIN_HEIGHT_PX = 96;
@@ -122,6 +127,28 @@ export class ChatGptDomAdapter {
       root.querySelector('[data-message-author-role="user"]') === null &&
       root.querySelector('[data-message-author-role="assistant"]') === null
     );
+  }
+
+  currentProjectRoute(
+    href: string = window.location.href,
+  ): ChatGptProjectRoute | null {
+    let url: URL;
+    try {
+      url = new URL(href, window.location.href);
+    } catch {
+      return null;
+    }
+    if (url.protocol !== "https:" || url.hostname !== "chatgpt.com")
+      return null;
+    const match = url.pathname.match(
+      /^\/g\/(g-p-[A-Za-z0-9]+)(?:-[^/]+)?(?:\/(project))?(?:\/c\/([^/]+))?\/?$/u,
+    );
+    const projectId = match?.[1];
+    if (!projectId) return null;
+    return {
+      projectId,
+      kind: match?.[3] ? "conversation" : "new",
+    };
   }
 
   nativeProjects(root: ParentNode = document): NativeChatGptProject[] {
