@@ -91,14 +91,33 @@ export function parseExtensionSettings(value: unknown): ExtensionSettings {
   };
 }
 
-export function renderBootstrapPrompt(settings: ExtensionSettings): string {
-  const selectedNames = settings.projects
-    .filter((project) => settings.selectedProjectIds.includes(project.id))
-    .map((project) => project.name);
-  if (selectedNames.length === 0 || !settings.bootstrapPrompt.trim()) return "";
-  const projectText = selectedNames.join(", ");
+function renderBootstrapPromptForNames(
+  settings: ExtensionSettings,
+  projectNames: string[],
+): string {
+  if (projectNames.length === 0 || !settings.bootstrapPrompt.trim()) return "";
+  const projectText = projectNames.join(", ");
   if (settings.bootstrapPrompt.includes("{{projects}}")) {
     return settings.bootstrapPrompt.replaceAll("{{projects}}", projectText);
   }
   return `${settings.bootstrapPrompt.trimEnd()}\n\nSelected project(s): ${projectText}`;
+}
+
+export function renderBootstrapPrompt(settings: ExtensionSettings): string {
+  return renderBootstrapPromptForNames(
+    settings,
+    settings.projects
+      .filter((project) => settings.selectedProjectIds.includes(project.id))
+      .map((project) => project.name),
+  );
+}
+
+export function renderBootstrapPromptForProject(
+  settings: ExtensionSettings,
+  projectId: string,
+): string {
+  if (!settings.selectedProjectIds.includes(projectId)) return "";
+  const project = settings.projects.find((item) => item.id === projectId);
+  if (!project) return "";
+  return renderBootstrapPromptForNames(settings, [project.name]);
 }
