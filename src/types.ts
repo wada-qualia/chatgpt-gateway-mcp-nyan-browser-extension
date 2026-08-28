@@ -64,6 +64,9 @@ export type RuntimeRequest =
   | { type: "auth:get-profile" }
   | { type: "auth:login" }
   | { type: "auth:logout" }
+  | { type: "chat-context:ensure"; projectId: string }
+  | { type: "chat-context:bind"; projectId: string; conversationRef: string }
+  | { type: "chat-context:resolve"; projectId: string; conversationRef: string }
   | { type: "settings:get" }
   | { type: "settings:update"; settings: ExtensionSettings };
 

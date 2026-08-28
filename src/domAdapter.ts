@@ -10,10 +10,9 @@ export type NativeChatGptProject = {
   href: string;
 };
 
-export type ChatGptProjectRoute = {
-  projectId: string;
-  kind: "new" | "conversation";
-};
+export type ChatGptProjectRoute =
+  | { projectId: string; kind: "new"; conversationId: null }
+  | { projectId: string; kind: "conversation"; conversationId: string };
 
 const COMPOSER_CONTROL_SIZE_PX = 64;
 const COMPOSER_CONTROL_GAP_PX = 8;
@@ -145,10 +144,10 @@ export class ChatGptDomAdapter {
     );
     const projectId = match?.[1];
     if (!projectId) return null;
-    return {
-      projectId,
-      kind: match?.[3] ? "conversation" : "new",
-    };
+    const conversationId = match?.[3] ?? null;
+    return conversationId
+      ? { projectId, kind: "conversation", conversationId }
+      : { projectId, kind: "new", conversationId: null };
   }
 
   nativeProjects(root: ParentNode = document): NativeChatGptProject[] {

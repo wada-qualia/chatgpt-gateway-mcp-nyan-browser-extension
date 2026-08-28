@@ -240,6 +240,16 @@ describe("BrowserOAuthClient", () => {
       ),
     ).toBe(false);
     expect(
+      isOAuthSessionTokenUsable(
+        {
+          accessToken: "legacy-token",
+          expiresAtMs: 20_000,
+          scope: "workspace:read",
+        },
+        10_000,
+      ),
+    ).toBe(false);
+    expect(
       isOAuthSessionTokenUsable({ accessToken: "legacy-token" }, 10_000),
     ).toBe(false);
   });

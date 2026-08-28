@@ -1,7 +1,7 @@
 import { browserFetch } from "./browserFetch";
 
 export const EXTENSION_CLIENT_ID = "atlas-chatgpt-browser-extension";
-export const EXTENSION_SCOPE = "workspace:read";
+export const EXTENSION_SCOPE = "workspace:read chat-context:write";
 export const EXTENSION_REDIRECT_URI =
   "https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2";
 export const EXTENSION_ACCESS_TOKEN_TTL_SECONDS = 3600;
@@ -102,8 +102,7 @@ function parseTokenResponse(value: unknown, nowMs: number): OAuthSessionToken {
     token.access_token.length === 0 ||
     token.token_type !== "Bearer" ||
     token.expires_in !== EXTENSION_ACCESS_TOKEN_TTL_SECONDS ||
-    scopeParts.length !== 1 ||
-    scopeParts[0] !== EXTENSION_SCOPE ||
+    scopeParts.join(" ") !== EXTENSION_SCOPE ||
     token.refresh_token !== undefined
   ) {
     throw new Error("Invalid OAuth token response");

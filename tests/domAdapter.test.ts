@@ -165,22 +165,30 @@ describe("ChatGptDomAdapter", () => {
       adapter.currentProjectRoute(
         `https://chatgpt.com/g/${projectId}-gateway-pilot/project`,
       ),
-    ).toEqual({ projectId, kind: "new" });
+    ).toEqual({ projectId, kind: "new", conversationId: null });
     expect(
       adapter.currentProjectRoute(
         `https://chatgpt.com/g/${projectId}-gateway-pilot`,
       ),
-    ).toEqual({ projectId, kind: "new" });
+    ).toEqual({ projectId, kind: "new", conversationId: null });
     expect(
       adapter.currentProjectRoute(
         `https://chatgpt.com/g/${projectId}-gateway-pilot/c/conversation-123`,
       ),
-    ).toEqual({ projectId, kind: "conversation" });
+    ).toEqual({
+      projectId,
+      kind: "conversation",
+      conversationId: "conversation-123",
+    });
     expect(
       adapter.currentProjectRoute(
         `https://chatgpt.com/g/${projectId}-gateway-pilot/project/c/conversation-123`,
       ),
-    ).toEqual({ projectId, kind: "conversation" });
+    ).toEqual({
+      projectId,
+      kind: "conversation",
+      conversationId: "conversation-123",
+    });
     expect(adapter.currentProjectRoute("https://chatgpt.com/")).toBeNull();
     expect(
       adapter.currentProjectRoute("https://chatgpt.com/c/conversation-123"),
