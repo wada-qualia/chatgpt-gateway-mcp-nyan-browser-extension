@@ -1,5 +1,6 @@
 import { PromptCache } from "./cache";
-import { GatewayClient } from "./gatewayClient";
+import { ChatContextCoordinator, ChatContextSessionStore } from "./chatContext";
+import { GatewayClient, GatewayRequestError } from "./gatewayClient";
 import {
   BrowserOAuthClient,
   isOAuthSessionTokenUsable,
@@ -14,8 +15,16 @@ declare const __ATLAS_PROMPT_CHANNEL__: string;
 
 const CONFIG_KEY = "atlas.gatewayConfig.v1";
 const TOKEN_KEY = "atlas.accessToken.v1";
+const chatContextStore = new ChatContextSessionStore(chrome.storage.session);
 
 type GatewayConfig = { baseUrl: string; channel: string };
+
+async function clearSessionIdentity(): Promise<void> {
+  await Promise.all([
+    chrome.storage.session.remove(TOKEN_KEY),
+    chatContextStore.clear(),
+  ]);
+}
 
 async function loadGatewayConfig(): Promise<GatewayConfig> {
   const local = await chrome.storage.local.get(CONFIG_KEY);
@@ -34,10 +43,19 @@ async function loadSessionToken(): Promise<OAuthSessionToken | undefined> {
   const session = await chrome.storage.session.get(TOKEN_KEY);
   const value = session[TOKEN_KEY] as unknown;
   if (!isOAuthSessionTokenUsable(value)) {
-    if (value !== undefined) await chrome.storage.session.remove(TOKEN_KEY);
+    if (value !== undefined) await clearSessionIdentity();
     return undefined;
   }
   return value;
+}
+
+async function loadGatewayClient(): Promise<GatewayClient> {
+  const config = await loadGatewayConfig();
+  const token = await loadSessionToken();
+  if (!token) {
+    throw new Error("extension Gateway authentication is not configured");
+  }
+  return new GatewayClient(config.baseUrl, token.accessToken);
 }
 
 async function loadRepository(): Promise<PromptRepository> {
@@ -61,7 +79,39 @@ async function loadSettings(): Promise<
   return parseExtensionSettings(local[EXTENSION_SETTINGS_KEY]);
 }
 
-async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
+function contentTabId(sender: chrome.runtime.MessageSender): number {
+  const tabId = sender.tab?.id;
+  if (!Number.isInteger(tabId)) {
+    throw new Error("chat context request requires a browser tab");
+  }
+  const pageUrl = sender.url ? new URL(sender.url) : null;
+  if (
+    !pageUrl ||
+    !["chatgpt.com", "chat.openai.com"].includes(pageUrl.hostname)
+  ) {
+    throw new Error("chat context request requires a ChatGPT page");
+  }
+  return tabId!;
+}
+
+function projectId(value: string): string {
+  if (!/^g-p-[A-Za-z0-9]+$/u.test(value)) {
+    throw new Error("invalid ChatGPT project id");
+  }
+  return value;
+}
+
+function conversationRef(value: string): string {
+  if (!/^[A-Za-z0-9_-]{1,512}$/u.test(value)) {
+    throw new Error("invalid ChatGPT conversation reference");
+  }
+  return value;
+}
+
+async function handle(
+  request: RuntimeRequest,
+  sender: chrome.runtime.MessageSender,
+): Promise<RuntimeResponse> {
   try {
     if (request.type === "auth:get-status") {
       return { ok: true, value: Boolean(await loadSessionToken()) };
@@ -75,7 +125,7 @@ async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
         token.accessToken,
       ).getUserInfo();
       if (!profile) {
-        await chrome.storage.session.remove(TOKEN_KEY);
+        await clearSessionIdentity();
         return { ok: true, value: null };
       }
       return { ok: true, value: profile };
@@ -83,12 +133,45 @@ async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
     if (request.type === "auth:login") {
       const config = await loadGatewayConfig();
       const token = await new BrowserOAuthClient(config.baseUrl).login();
+      await chatContextStore.clear();
       await chrome.storage.session.set({ [TOKEN_KEY]: token });
       return { ok: true, value: true };
     }
     if (request.type === "auth:logout") {
-      await chrome.storage.session.remove(TOKEN_KEY);
+      await clearSessionIdentity();
       return { ok: true, value: false };
+    }
+    if (request.type === "chat-context:ensure") {
+      const tabId = contentTabId(sender);
+      const client = await loadGatewayClient();
+      const coordinator = new ChatContextCoordinator(chatContextStore, client);
+      const value = await coordinator.ensure(
+        tabId,
+        projectId(request.projectId),
+      );
+      return { ok: true, value };
+    }
+    if (request.type === "chat-context:bind") {
+      const tabId = contentTabId(sender);
+      const client = await loadGatewayClient();
+      const coordinator = new ChatContextCoordinator(chatContextStore, client);
+      const value = await coordinator.bind(
+        tabId,
+        projectId(request.projectId),
+        conversationRef(request.conversationRef),
+      );
+      return { ok: true, value };
+    }
+    if (request.type === "chat-context:resolve") {
+      const tabId = contentTabId(sender);
+      const client = await loadGatewayClient();
+      const coordinator = new ChatContextCoordinator(chatContextStore, client);
+      const value = await coordinator.resolve(
+        tabId,
+        projectId(request.projectId),
+        conversationRef(request.conversationRef),
+      );
+      return { ok: true, value };
     }
     if (request.type === "settings:get") {
       return { ok: true, value: await loadSettings() };
@@ -112,6 +195,9 @@ async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
     }
     return { ok: true, value: await repository.getPrompt(request.promptId) };
   } catch (error) {
+    if (error instanceof GatewayRequestError && error.status === 401) {
+      await clearSessionIdentity();
+    }
     return {
       ok: false,
       error:
@@ -121,9 +207,9 @@ async function handle(request: RuntimeRequest): Promise<RuntimeResponse> {
 }
 
 chrome.runtime.onMessage.addListener(
-  (message: unknown, _sender, sendResponse) => {
+  (message: unknown, sender, sendResponse) => {
     const request = message as RuntimeRequest;
-    void handle(request).then(sendResponse);
+    void handle(request, sender).then(sendResponse);
     return true;
   },
 );

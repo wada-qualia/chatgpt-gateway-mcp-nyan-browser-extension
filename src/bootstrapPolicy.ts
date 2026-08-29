@@ -11,3 +11,17 @@ export function bootstrapPromptForRoute(
   if (!route || route.kind !== "new") return "";
   return renderBootstrapPromptForProject(settings, route.projectId);
 }
+
+export function canApplyAsyncBootstrap(
+  expectedProjectId: string,
+  route: ChatGptProjectRoute | null,
+  sameComposer: boolean,
+  emptyConversation: boolean,
+): boolean {
+  return (
+    sameComposer &&
+    emptyConversation &&
+    route?.kind === "new" &&
+    route.projectId === expectedProjectId
+  );
+}

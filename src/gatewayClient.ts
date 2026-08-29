@@ -1,4 +1,10 @@
 import { browserFetch } from "./browserFetch";
+import {
+  parseChatContextBinding,
+  parseChatContextLease,
+  type ChatContextBinding,
+  type ChatContextLease,
+} from "./chatContext";
 import type { AuthProfile, PromptBundle, PromptManifest } from "./types";
 
 export type GatewayResult<T> =
@@ -81,6 +87,16 @@ export function parseUserInfo(value: unknown): AuthProfile {
   return { displayName: username.trim() };
 }
 
+export class GatewayRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "GatewayRequestError";
+  }
+}
+
 export class GatewayClient {
   constructor(
     private readonly baseUrl: string,
@@ -95,6 +111,31 @@ export class GatewayClient {
 
   private authorizationHeaders(): Headers {
     return new Headers({ Authorization: `Bearer ${this.accessToken}` });
+  }
+
+  private async postJson<T>(
+    path: string,
+    body: Record<string, unknown>,
+    parse: (value: unknown) => T,
+    allowNotFound = false,
+  ): Promise<T | null> {
+    const headers = this.authorizationHeaders();
+    headers.set("Content-Type", "application/json");
+    const response = await this.fetcher(new URL(path, this.baseUrl), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (allowNotFound && response.status === 404) return null;
+    if (response.status !== 200) {
+      throw new GatewayRequestError(
+        response.status,
+        `Gateway request failed with status ${response.status}`,
+      );
+    }
+    return parse((await response.json()) as unknown);
   }
 
   private async get<T>(
@@ -137,6 +178,58 @@ export class GatewayClient {
       throw new Error(`unexpected Gateway userinfo status ${response.status}`);
     }
     return parseUserInfo((await response.json()) as unknown);
+  }
+
+  async createChatContext(input: {
+    clientNonce: string;
+    projectRef: string;
+  }): Promise<ChatContextLease> {
+    if (!input.clientNonce || input.clientNonce.length > 128) {
+      throw new Error("invalid chat context nonce");
+    }
+    if (!input.projectRef || input.projectRef.length > 255) {
+      throw new Error("invalid chat context project");
+    }
+    const result = await this.postJson(
+      "/api/chat-contexts/v1/contexts",
+      { client_nonce: input.clientNonce, project_ref: input.projectRef },
+      parseChatContextLease,
+    );
+    if (!result) throw new Error("chat context create returned no lease");
+    return result;
+  }
+
+  async bindChatContext(
+    contextId: string,
+    conversationRef: string,
+  ): Promise<ChatContextBinding> {
+    if (!contextId || contextId.length > 64) {
+      throw new Error("invalid chat context id");
+    }
+    if (!conversationRef || conversationRef.length > 512) {
+      throw new Error("invalid conversation reference");
+    }
+    const result = await this.postJson(
+      `/api/chat-contexts/v1/contexts/${encodeURIComponent(contextId)}/bind`,
+      { conversation_ref: conversationRef },
+      parseChatContextBinding,
+    );
+    if (!result) throw new Error("chat context bind returned no receipt");
+    return result;
+  }
+
+  resolveChatContext(
+    conversationRef: string,
+  ): Promise<ChatContextLease | null> {
+    if (!conversationRef || conversationRef.length > 512) {
+      throw new Error("invalid conversation reference");
+    }
+    return this.postJson(
+      "/api/chat-contexts/v1/resolve",
+      { conversation_ref: conversationRef },
+      parseChatContextLease,
+      true,
+    );
   }
 
   getManifest(

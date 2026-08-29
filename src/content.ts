@@ -1,6 +1,13 @@
 import { parseAtlasActions } from "./actions";
 import { pickNekoAsset } from "./assets/neko";
-import { bootstrapPromptForRoute } from "./bootstrapPolicy";
+import {
+  bootstrapPromptForRoute,
+  canApplyAsyncBootstrap,
+} from "./bootstrapPolicy";
+import {
+  parseRuntimeChatContextLease,
+  renderChatContextBootstrap,
+} from "./chatContext";
 import { ChatGptDomAdapter } from "./domAdapter";
 import {
   MAX_PROJECTS,
@@ -25,6 +32,8 @@ const promptModes: Array<[string, string]> = [
 ];
 const bootstrapInFlight = new WeakSet<HTMLElement>();
 const bootstrapApplied = new WeakMap<HTMLElement, string>();
+let contextBindingInFlight: string | null = null;
+let contextBindingApplied: string | null = null;
 
 async function runtime(request: RuntimeRequest): Promise<RuntimeResponse> {
   return chrome.runtime.sendMessage(request);
@@ -61,23 +70,60 @@ async function maybeBootstrapSelectedProjects(): Promise<void> {
     const prompt = bootstrapPromptForRoute(settings, route);
     if (!prompt) return;
 
+    const contextResult = await runtime({
+      type: "chat-context:ensure",
+      projectId: route.projectId,
+    });
+    if (!contextResult.ok) return;
+    const context = parseRuntimeChatContextLease(contextResult.value);
+    const contextualPrompt = renderChatContextBootstrap(prompt, context);
+
     const currentRoute = adapter.currentProjectRoute();
     if (
-      adapter.resolveComposer() !== composer ||
-      !currentRoute ||
-      currentRoute.kind !== "new" ||
-      currentRoute.projectId !== route.projectId ||
-      !adapter.isEmptyConversation()
+      !canApplyAsyncBootstrap(
+        route.projectId,
+        currentRoute,
+        adapter.resolveComposer() === composer,
+        adapter.isEmptyConversation(),
+      )
     ) {
       return;
     }
-    if (adapter.insertComposerText(prompt)) {
+    if (adapter.insertComposerText(contextualPrompt)) {
       bootstrapApplied.set(composer, route.projectId);
     }
   } catch {
-    // Automatic bootstrap is best-effort and must not interfere with ChatGPT.
+    // Automatic bootstrap is fail-closed and must not interfere with ChatGPT.
   } finally {
     bootstrapInFlight.delete(composer);
+  }
+}
+
+async function maybeBindSelectedProjectConversation(): Promise<void> {
+  const route = adapter.currentProjectRoute();
+  if (!route || route.kind !== "conversation") return;
+  const key = `${route.projectId}:${route.conversationId}`;
+  if (contextBindingApplied === key || contextBindingInFlight === key) return;
+
+  contextBindingInFlight = key;
+  try {
+    const settingsResult = await runtime({ type: "settings:get" });
+    if (!settingsResult.ok) return;
+    const settings = parseExtensionSettings(settingsResult.value);
+    if (!settings.selectedProjectIds.includes(route.projectId)) return;
+
+    const result = await runtime({
+      type: "chat-context:bind",
+      projectId: route.projectId,
+      conversationRef: route.conversationId,
+    });
+    if (!result.ok) return;
+    if (result.value !== null) parseRuntimeChatContextLease(result.value);
+    contextBindingApplied = key;
+  } catch {
+    // Conversation binding is best-effort for page UX and fail-closed for ATLAS calls.
+  } finally {
+    if (contextBindingInFlight === key) contextBindingInFlight = null;
   }
 }
 
@@ -304,6 +350,7 @@ function buildComposerControls(): HTMLElement {
         signInButton.title = result.error;
         return;
       }
+      contextBindingApplied = null;
       await refreshAuthControls();
     })();
   });
@@ -321,6 +368,7 @@ function buildComposerControls(): HTMLElement {
         signOutButton.title = result.error;
         return;
       }
+      contextBindingApplied = null;
       userSubmenu.hidden = true;
       await refreshAuthControls();
     })();
@@ -607,9 +655,30 @@ function buildComposerControls(): HTMLElement {
           "The current project chat is not empty. Existing conversation or composer text will not be overwritten.";
         return;
       }
+      const contextResult = await runtime({
+        type: "chat-context:ensure",
+        projectId: route.projectId,
+      });
+      if (!contextResult.ok) {
+        settingsStatus.textContent = contextResult.error;
+        return;
+      }
+      const context = parseRuntimeChatContextLease(contextResult.value);
+      const contextualPrompt = renderChatContextBootstrap(prompt, context);
+      const currentRoute = adapter.currentProjectRoute();
       const composer = adapter.resolveComposer();
-      if (!composer || !adapter.insertComposerText(prompt)) {
-        settingsStatus.textContent = "ChatGPT composer is not available.";
+      if (
+        !composer ||
+        !canApplyAsyncBootstrap(
+          route.projectId,
+          currentRoute,
+          true,
+          adapter.isEmptyConversation(),
+        ) ||
+        !adapter.insertComposerText(contextualPrompt)
+      ) {
+        settingsStatus.textContent =
+          "ChatGPT composer is not available or the route changed.";
         return;
       }
       bootstrapApplied.set(composer, route.projectId);
@@ -689,6 +758,7 @@ function reconcile(): void {
     adapter.mountComposerControls(buildComposerControls());
   }
   void maybeBootstrapSelectedProjects();
+  void maybeBindSelectedProjectConversation();
   for (const message of adapter.assistantMessages()) {
     if (message.querySelector('[data-atlas-extension-root="message-actions"]'))
       continue;
