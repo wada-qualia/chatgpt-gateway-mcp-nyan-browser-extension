@@ -72,4 +72,4 @@ The extension recognizes the existing fenced `atlas-actions` envelope for compat
 
 ## License
 
-The publication candidate uses Apache License 2.0. Final public visibility remains subject to the repository owner's OSS license approval.
+MIT License. See [LICENSE](LICENSE).
