@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const manifestPath = resolve(process.cwd(), "dist/manifest.json");
@@ -39,44 +39,8 @@ const content = manifest.content_scripts?.[0];
 if (content?.world !== "ISOLATED")
   throw new Error("content script must use isolated world");
 
-const expectedNekoResources = [
-  "assets/neko/interesting/*.png",
-  "assets/neko/waiting/*.png",
-];
-const webAccessibleResources = manifest.web_accessible_resources;
-if (
-  !Array.isArray(webAccessibleResources) ||
-  webAccessibleResources.length !== 1
-) {
-  throw new Error("exactly one web-accessible resource group is required");
-}
-const nekoResources = webAccessibleResources[0];
-if (
-  !Array.isArray(nekoResources?.resources) ||
-  JSON.stringify([...nekoResources.resources].sort()) !==
-    JSON.stringify(expectedNekoResources) ||
-  JSON.stringify(nekoResources.matches) !==
-    JSON.stringify(["https://chatgpt.com/*"])
-) {
-  throw new Error("neko assets must stay scoped to chatgpt.com");
-}
-for (const [mood, expectedCount] of [
-  ["waiting", 26],
-  ["interesting", 25],
-]) {
-  const entries = await readdir(
-    resolve(process.cwd(), "dist/assets/neko", mood),
-    { withFileTypes: true },
-  );
-  const files = entries
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name);
-  if (
-    files.length !== expectedCount ||
-    files.some((name) => !/^icon_[0-9]{2}\.png$/u.test(name))
-  ) {
-    throw new Error(`unexpected ${mood} neko asset inventory`);
-  }
+if (manifest.web_accessible_resources !== undefined) {
+  throw new Error("public build must not expose web-accessible resources");
 }
 
 if (

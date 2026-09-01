@@ -1,85 +1,75 @@
-# ChatGPT MCP Browser Extension
+# ChatGPT Gateway MCP Nyan Browser Extension
 
-First-party Chrome Manifest V3 development extension that adds ATLAS workflow controls to `chatgpt.com` while keeping ChatGPT as the owner of conversation state and native branching.
+Chrome Manifest V3 extension that adds ChatGPT-side controls for [ChatGPT Gateway MCP Nyan](https://github.com/wada-qualia/chatgpt-gateway-mcp-nyan).
 
-## Boundaries
+The extension keeps ChatGPT as the owner of conversation state. It provides Gateway authentication, project/bootstrap settings, chat-context binding and explicit user-triggered workflow actions without injecting a remote script or taking over native conversation branching.
 
-- The extension owns its Manifest V3 client, ChatGPT DOM adapter, extension UI, browser-local prompt cache and immutable browser artifact.
-- ChatGPT MCP Gateway owns browser authentication/authorization and is the only network API used by the extension.
-- Prompt Registry owns prompt identities, immutable prompt versions/releases, channel pointers and revocation. The extension never calls Prompt Registry directly.
-- Prompt text is data, never executable code. ChatGPT cookies/tokens and private ChatGPT HTTP APIs are not read or used.
+## Security boundary
 
-## Identity and security
+The extension is deliberately narrow:
 
-The deterministic development extension ID is `cgaalfflopmcbaodnlphklclnnhmdhcn`. The repository stores only the public manifest key; no private signing key is required or committed. The Gateway browser-client contract pins the corresponding exact OAuth redirect to `https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2`. The public client ID is `atlas-chatgpt-browser-extension`, and its only OAuth scope is `workspace:read`.
+- content scripts run in Chrome's `ISOLATED` world;
+- permissions are limited to `identity` and `storage`;
+- the default host permission is only `https://chatgpt.com/*`;
+- a Gateway origin is injected only at build time and must be an exact HTTPS origin;
+- the public build exposes no `web_accessible_resources`;
+- OAuth uses PKCE and a public client without a client secret;
+- assistant action blocks are treated as untrusted model output and require schema validation plus an explicit click.
 
-The content script runs in the isolated world. Gateway bearer credentials are confined to the MV3 service worker and `chrome.storage.session`. The manifest grants only `identity`, `storage`, and exact HTTPS origins. There is no `<all_urls>`, `eval`, remote executable code, `tabs`, or `webRequest` permission.
+The deterministic manifest public key produces extension ID `cgaalfflopmcbaodnlphklclnnhmdhcn` and redirect URI `https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2`. The Gateway deployment must register the public client ID `chatgpt-gateway-mcp-nyan-browser-extension` with that exact redirect and the required scope.
 
-## Authentication
+No private signing key is stored in this repository.
 
-The ATLAS menu exposes an explicit **Sign in** control when unauthenticated. After authentication it shows the Gateway `preferred_username` next to a user icon; clicking that profile opens a nested account menu containing **Sign out**. The display name is read through Gateway `/oauth/userinfo` by the service worker and is not persisted by the extension. Sign in is always initiated by a user click and stays in the service worker: it resolves the exact Chromium redirect with `chrome.identity.getRedirectURL("oauth2")`, verifies that it equals the pinned redirect above, generates high-entropy `state` and an S256 PKCE verifier/challenge, resumes the Gateway `/oauth/authorize` request through `/auth/login`, validates callback origin/path/state, and exchanges the code at `/oauth/token` as a public client without a `client_secret`.
-
-Only the bearer access token, expiry timestamp and `workspace:read` scope are stored in `chrome.storage.session`. Expired, legacy or wrong-scope tokens fail closed and are removed. No bearer value is returned to the content script or written to DOM/page JavaScript. Sign out clears the session token locally; the Gateway access token is additionally bounded by the one-hour browser-client TTL.
-
-## Prompt delivery
-
-The service worker consumes the accepted Gateway Prompt Registry facade:
-
-- `GET /api/prompts/v1/releases/{channel}/manifest`
-- `GET /api/prompts/v1/bundles/{bundle_id}`
-
-It performs explicit ETag revalidation, verifies per-prompt and aggregate SHA-256, atomically stores the validated bundle in `chrome.storage.local`, keys policy state by opaque `cache_scope_id`, permits last-known-good fallback only inside `max_stale_seconds`, and purges/fails closed on known HTTP `410` revocation. A scope change never reuses a previous scope's bundle validator.
-
-## User interaction
-
-The content script mounts extension-owned controls next to a uniquely resolved composer. Takeoff, Plan, Phases and Current phase insert prompt text but never send automatically. The prompt menu closes on outside click and `Escape`. Authenticated users are represented by a profile row with a nested sign-out menu instead of a direct logout action.
-
-The composer toggle is a packaged Neko visual rather than a text glyph. Its typed TypeScript asset catalog lives under `src/assets/neko`: a waiting image is selected when controls mount, an interesting image is preloaded and cross-faded on pointer hover or keyboard focus, and a bounded CSS-only multicolor ripple passes over the icon during the transition. The visible Neko is 62×62 inside a 64×64 control: compact composers keep the control vertically centered, while composer surfaces at least 96px tall anchor it to the bottom control row and a `ResizeObserver` tracks native ChatGPT auto-resizing. The wave is deliberately muted and its maximum geometric excursion is about 10px beyond the image edge (below the 15px cap). The next interesting image is prepared after the interaction ends so repeated hovers can vary without a network dependency. All PNGs are immutable extension assets copied into `dist/assets/neko`; the only web-accessible-resource grant is scoped to `https://chatgpt.com/*`. `prefers-reduced-motion` disables the ripple animation while preserving the state change.
-
-Settings opens an extension-owned full-screen overlay where projects are discovered from the visible native ChatGPT project links in the left sidebar and offered through a dropdown instead of requiring manual name entry. Adding a project stores its stable native `g-p-*` project id and display name locally; the user may select any subset and edit the project bootstrap prompt. Project names, selection state and the bootstrap template stay in `chrome.storage.local`; the extension does not call undocumented ChatGPT project APIs. Automatic bootstrap is fail-closed on the current ChatGPT URL: only a new project-root route for a selected `g-p-*` id is eligible, while existing project conversations (`.../c/<conversation-id>`), unselected projects, ordinary chats and chats outside projects are never bootstrapped. The current project id is revalidated after the asynchronous settings read, and the composer must still be unique and empty with no user/assistant messages before insertion. The rendered bootstrap names only the current selected project, never all selected projects. Each composer/project pair is bootstrapped at most once so manually clearing the draft does not cause immediate re-insertion; leaving the new-project route clears that suppression so a later genuinely new chat can bootstrap again. The extension never auto-sends or overwrites existing composer/conversation state. The supported template placeholder is `{{projects}}`. Hidden/private ChatGPT system prompts are intentionally not used because they would cross the documented ChatGPT ownership boundary.
-
-Assistant `atlas-actions` blocks are treated as untrusted model output and only allow `compose`, `copy_prompt`, and native-DOM `branch_and_compose` after schema validation and an explicit click. DOM ambiguity fails closed.
-
-## Development
-
-Required CI toolchain is Node `22.22.0` and npm `10.9.4`.
+## Build
 
 ```bash
-npm ci --ignore-scripts
-npm audit --audit-level=moderate
+npm ci
 npm run check
-npm run package
-node scripts/generate-sbom.mjs
-node scripts/generate-provenance.mjs
 ```
 
-For a controlled unpacked Chrome installation, build into one stable reload directory instead of a per-worktree `dist` path:
+PowerShell:
+
+```powershell
+npm ci
+npm run check
+```
+
+A build with no Gateway origin remains network-disabled apart from ChatGPT itself. To build for a specific Gateway:
 
 ```bash
-ATLAS_GATEWAY_ORIGIN=https://gateway.example.com ATLAS_PROMPT_CHANNEL=dev npm run build:unpacked
+ATLAS_GATEWAY_ORIGIN=https://gateway.example.com npm run build
 ```
 
-By default `build:unpacked` resolves the repository's primary Git worktree and atomically refreshes `<primary-worktree>/.atlas-unpacked/chatgpt-mcp-browser-extension`. Load that directory once with Chrome **Load unpacked**; subsequent builds keep the same path, so Chrome's **Reload** button is sufficient. `ATLAS_BUILD_INFO.json` records the source `HEAD`, extension version and `working_tree_dirty`; a clean build therefore has an exact source-SHA receipt while a development build is explicitly marked dirty. The stable unpacked directory is ignored by Git and is not a release source of truth. `ATLAS_UNPACKED_DIR` may override the target only for an explicitly controlled local install.
+PowerShell:
 
-Set `ATLAS_GATEWAY_ORIGIN` to the approved exact HTTPS Gateway origin when producing a build that may contact Gateway, and optionally set `ATLAS_PROMPT_CHANNEL` (default `dev`). The build injects the origin into both the service-worker runtime configuration and the exact matching `host_permissions` entry; it rejects non-HTTPS/non-origin values and invalid channel names. The accepted current public Gateway origin is `https://gateway.example.com`, but it is intentionally not an implicit build default: networking remains an explicit build-time opt-in.
+```powershell
+$env:ATLAS_GATEWAY_ORIGIN = "https://gateway.example.com"
+npm run build
+```
 
-## CI/CD and artifacts
+`ATLAS_GATEWAY_ORIGIN`, `ATLAS_PROMPT_CHANNEL`, `atlas.*` storage keys, `atlas-actions` envelopes and `data-atlas-*` DOM attributes are retained as versioned compatibility identifiers from the existing deployed client. They are not a requirement that downstream deployments use ATLAS as their public product name. Renaming them requires an explicit migration/compatibility plan.
 
-GitLab CI is independent from Gateway and Prompt Registry deployment. It validates dependencies, formatting, lint, typecheck, unit/DOM/cache tests, build and manifest policy, then produces:
+## Load unpacked
 
-- `chatgpt-mcp-browser-extension.zip`
-- SHA-256 checksum
-- CycloneDX 1.5 SBOM
-- provenance JSON bound to source SHA and deterministic extension identity
+After `npm run build`, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `dist/`.
 
-Extension-only CI performs no Gateway blue/green deployment and no Prompt Registry deployment or publication.
+For local development the legacy `npm run build:unpacked` helper maintains a stable `.atlas-unpacked/` directory so Chrome can reload the same extension path between builds.
 
-The GitLab project must have an online untagged-capable Docker runner assigned, and the identity that creates a pipeline must retain project membership sufficient to read the repository. Keep repository visibility and CI job-token protections intact; fix missing runner assignment or membership instead of weakening those controls. When a pipeline fails before source checkout, prefer a new push pipeline after repairing project configuration rather than retrying a terminal job whose ephemeral pipeline ref may already have been removed.
+## OAuth and user interaction
 
-## Rollback
+Sign-in is initiated only by an explicit user action. The service worker obtains the exact Chrome redirect URI, creates high-entropy state and an S256 PKCE verifier/challenge, validates the callback, then exchanges the authorization code at the configured Gateway.
 
-Extension rollback is artifact-local: restore the previous verified ZIP/unpacked directory and reload the controlled development profile. Prompt-data rollback remains a Prompt Registry channel-pointer operation, and Gateway rollback is independent. No rollback domain rewrites another domain's data.
+The content script never receives or stores a client secret. Session/access state should still be treated as sensitive browser data.
 
-## Current integration status
+## Workflow actions
 
-The extension runtime/cache/action/DOM integration, Gateway OAuth public-client PKCE/login-resume path, exact Chromium redirect pinning, least-privilege `workspace:read` scope, local project-aware settings, safe empty-chat bootstrap and independent artifact lane are implemented. Root control-plane placement is registered, and the controlled isolated Chrome-for-Testing pilot has accepted composer placement, outside-click/Escape dismissal, project persistence/multi-select, non-overwrite bootstrap semantics, authenticated username rendering, nested sign-out and logout token cleanup. This remains a controlled development/pilot extension; Chrome Web Store publication, managed-enterprise distribution and broad production rollout are not implied.
+The extension recognizes the existing fenced `atlas-actions` envelope for compatibility. Supported actions are bounded and validated before display. The extension never treats arbitrary assistant text as executable code.
+
+## Related repositories
+
+- Gateway core: https://github.com/wada-qualia/chatgpt-gateway-mcp-nyan
+- CLI/thin client: https://github.com/wada-qualia/chatgpt-gateway-mcp-nyan-cli
+
+## License
+
+The publication candidate uses Apache License 2.0. Final public visibility remains subject to the repository owner's OSS license approval.

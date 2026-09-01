@@ -1,5 +1,4 @@
 import { parseAtlasActions } from "./actions";
-import { pickNekoAsset } from "./assets/neko";
 import {
   bootstrapPromptForRoute,
   canApplyAsyncBootstrap,
@@ -143,87 +142,13 @@ function createButton(label: string, className?: string): HTMLButtonElement {
   return button;
 }
 
-function createNekoToggle(): HTMLButtonElement {
+function createGatewayToggle(): HTMLButtonElement {
   const button = createButton("", "atlas-extension-toggle");
-  const shell = document.createElement("span");
-  shell.className = "atlas-extension-neko-shell";
-  shell.setAttribute("aria-hidden", "true");
-
-  const waitingImage = document.createElement("img");
-  waitingImage.className =
-    "atlas-extension-neko-image atlas-extension-neko-waiting";
-  waitingImage.alt = "";
-  waitingImage.draggable = false;
-  waitingImage.decoding = "async";
-
-  const interestingImage = document.createElement("img");
-  interestingImage.className =
-    "atlas-extension-neko-image atlas-extension-neko-interesting";
-  interestingImage.alt = "";
-  interestingImage.draggable = false;
-  interestingImage.decoding = "async";
-
-  const wave = document.createElement("span");
-  wave.className = "atlas-extension-neko-wave";
-
-  const waitingAsset = pickNekoAsset("waiting");
-  waitingImage.src = chrome.runtime.getURL(waitingAsset);
-  button.dataset.nekoWaitingAsset = waitingAsset;
-
-  let interestingAsset = pickNekoAsset("interesting");
-  const refreshInterestingAsset = (): void => {
-    let nextAsset = pickNekoAsset("interesting");
-    for (
-      let attempt = 0;
-      attempt < 4 && nextAsset === interestingAsset;
-      attempt += 1
-    ) {
-      nextAsset = pickNekoAsset("interesting");
-    }
-    interestingAsset = nextAsset;
-    interestingImage.src = chrome.runtime.getURL(interestingAsset);
-    button.dataset.nekoInterestingAsset = interestingAsset;
-  };
-  interestingImage.src = chrome.runtime.getURL(interestingAsset);
-  button.dataset.nekoInterestingAsset = interestingAsset;
-
-  let pointerActive = false;
-  let focusActive = false;
-  let refreshTimer: number | null = null;
-  const syncActiveState = (): void => {
-    const active = pointerActive || focusActive;
-    button.dataset.nekoActive = String(active);
-    if (active) {
-      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
-      refreshTimer = null;
-      return;
-    }
-    if (refreshTimer !== null) window.clearTimeout(refreshTimer);
-    refreshTimer = window.setTimeout(() => {
-      refreshInterestingAsset();
-      refreshTimer = null;
-    }, 360);
-  };
-
-  button.addEventListener("pointerenter", () => {
-    pointerActive = true;
-    syncActiveState();
-  });
-  button.addEventListener("pointerleave", () => {
-    pointerActive = false;
-    syncActiveState();
-  });
-  button.addEventListener("focus", () => {
-    focusActive = true;
-    syncActiveState();
-  });
-  button.addEventListener("blur", () => {
-    focusActive = false;
-    syncActiveState();
-  });
-
-  shell.append(waitingImage, interestingImage, wave);
-  button.append(shell);
+  const mark = document.createElement("span");
+  mark.className = "atlas-extension-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "N";
+  button.append(mark);
   return button;
 }
 
@@ -231,9 +156,9 @@ function buildComposerControls(): HTMLElement {
   const root = document.createElement("div");
   root.className = "atlas-extension-menu";
 
-  const toggle = createNekoToggle();
-  toggle.title = "ATLAS";
-  toggle.setAttribute("aria-label", "Open ATLAS workflow prompts");
+  const toggle = createGatewayToggle();
+  toggle.title = "Gateway Nyan";
+  toggle.setAttribute("aria-label", "Open Gateway Nyan workflow prompts");
   toggle.setAttribute("aria-haspopup", "menu");
   toggle.setAttribute("aria-expanded", "false");
 
@@ -289,7 +214,7 @@ function buildComposerControls(): HTMLElement {
   const signInButton = createButton("Sign in", "atlas-extension-auth");
   signInButton.dataset.atlasAuthControl = "true";
   signInButton.setAttribute("role", "menuitem");
-  signInButton.setAttribute("aria-label", "Sign in to ATLAS Gateway");
+  signInButton.setAttribute("aria-label", "Sign in to Gateway Nyan");
 
   const accountWrap = document.createElement("div");
   accountWrap.className = "atlas-extension-account-wrap";
@@ -334,7 +259,7 @@ function buildComposerControls(): HTMLElement {
       userName.textContent = profile.displayName;
       accountButton.setAttribute(
         "aria-label",
-        `ATLAS account ${profile.displayName}`,
+        `Gateway account ${profile.displayName}`,
       );
       accountButton.title = profile.displayName;
     } else {
@@ -387,7 +312,7 @@ function buildComposerControls(): HTMLElement {
   settingsHeader.className = "atlas-extension-settings-header";
   const settingsTitle = document.createElement("h2");
   settingsTitle.id = "atlas-extension-settings-title";
-  settingsTitle.textContent = "ATLAS settings";
+  settingsTitle.textContent = "Gateway Nyan settings";
   const settingsClose = createButton("×", "atlas-extension-settings-close");
   settingsClose.setAttribute("aria-label", "Close ATLAS settings");
   settingsHeader.append(settingsTitle, settingsClose);
@@ -544,7 +469,7 @@ function buildComposerControls(): HTMLElement {
       return;
     }
     if (settingsDraft.projects.length >= MAX_PROJECTS) {
-      settingsStatus.textContent = `ATLAS supports up to ${MAX_PROJECTS} configured projects.`;
+      settingsStatus.textContent = `Gateway supports up to ${MAX_PROJECTS} configured projects.`;
       return;
     }
     if (

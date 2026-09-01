@@ -1,6 +1,6 @@
 import { browserFetch } from "./browserFetch";
 
-export const EXTENSION_CLIENT_ID = "atlas-chatgpt-browser-extension";
+export const EXTENSION_CLIENT_ID = "chatgpt-gateway-mcp-nyan-browser-extension";
 export const EXTENSION_SCOPE = "workspace:read chat-context:write";
 export const EXTENSION_REDIRECT_URI =
   "https://cgaalfflopmcbaodnlphklclnnhmdhcn.chromiumapp.org/oauth2";

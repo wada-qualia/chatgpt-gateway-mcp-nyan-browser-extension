@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/chatgpt-mcp-browser-extension",
+  "name": "chatgpt-gateway-mcp-nyan-browser-extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",

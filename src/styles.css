@@ -46,167 +46,39 @@
   outline-offset: 3px;
 }
 
-.atlas-extension-neko-shell {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 0;
+.atlas-extension-mark {
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   place-items: center;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  isolation: isolate;
-}
-
-.atlas-extension-neko-image {
-  position: absolute;
-  z-index: 1;
-  width: 62px;
-  height: 62px;
-  object-fit: contain;
-  object-position: center;
-  opacity: 1;
-  transform: scale(1) translateZ(0);
-  transform-origin: center;
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, #000 24%, transparent));
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, #64d2ff 26%, Canvas),
+    color-mix(in srgb, #bf5af2 22%, Canvas)
+  );
+  box-shadow: 0 4px 14px color-mix(in srgb, CanvasText 12%, transparent);
+  color: CanvasText;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   transition:
-    opacity 210ms ease,
-    transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    filter 340ms ease;
+    transform 160ms ease,
+    box-shadow 160ms ease;
   user-select: none;
-  -webkit-user-drag: none;
-  will-change: opacity, transform, filter;
 }
 
-.atlas-extension-neko-interesting {
-  z-index: 2;
-  opacity: 0;
-  transform: scale(0.86) rotate(-1.5deg) translateZ(0);
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, #000 22%, transparent))
-    saturate(1.04);
-}
-
-.atlas-extension-neko-wave {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  border-radius: 999px;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.atlas-extension-neko-wave::before,
-.atlas-extension-neko-wave::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  content: "";
-  opacity: 0;
-  transform: scale(0.72) rotate(-28deg);
-  background: conic-gradient(
-    from 205deg,
-    #64d2ff 0deg,
-    #5e5ce6 74deg,
-    #bf5af2 146deg,
-    #ff375f 218deg,
-    #30d5c8 292deg,
-    #64d2ff 360deg
-  );
-  -webkit-mask: radial-gradient(
-    circle,
-    transparent 0 34%,
-    #000 43% 61%,
-    transparent 74%
-  );
-  mask: radial-gradient(
-    circle,
-    transparent 0 34%,
-    #000 43% 61%,
-    transparent 74%
-  );
-  filter: blur(0.55px) saturate(1.16) brightness(1.01);
-  will-change: opacity, transform;
-}
-
-.atlas-extension-neko-wave::after {
-  transform: scale(0.68) rotate(24deg);
-  filter: blur(0.8px) saturate(1.2) brightness(1.03);
-}
-
-.atlas-extension-toggle[data-neko-active="true"] .atlas-extension-neko-waiting {
-  opacity: 0;
-  transform: scale(1.05) rotate(1.5deg) translateZ(0);
-  filter: blur(0.25px)
-    drop-shadow(0 0 3px color-mix(in srgb, #64d2ff 22%, transparent));
-}
-
-.atlas-extension-toggle[data-neko-active="true"]
-  .atlas-extension-neko-interesting {
-  opacity: 1;
-  transform: scale(1) rotate(0deg) translateZ(0);
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, #000 22%, transparent))
-    drop-shadow(0 0 3px color-mix(in srgb, #bf5af2 18%, transparent))
-    saturate(1.08) brightness(1.01);
-}
-
-.atlas-extension-toggle[data-neko-active="true"]
-  .atlas-extension-neko-wave::before {
-  animation: atlas-extension-neko-wave 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.atlas-extension-toggle[data-neko-active="true"]
-  .atlas-extension-neko-wave::after {
-  animation: atlas-extension-neko-wave-secondary 820ms
-    cubic-bezier(0.16, 1, 0.3, 1) 55ms both;
-}
-
-.atlas-extension-toggle[aria-expanded="true"] .atlas-extension-neko-waiting {
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, #000 22%, transparent))
-    drop-shadow(0 0 3px color-mix(in srgb, #64d2ff 18%, transparent));
-}
-
-@keyframes atlas-extension-neko-wave {
-  0% {
-    opacity: 0;
-    transform: scale(0.72) rotate(-28deg);
-  }
-  24% {
-    opacity: 0.42;
-  }
-  68% {
-    opacity: 0.24;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.22) rotate(58deg);
-  }
-}
-
-@keyframes atlas-extension-neko-wave-secondary {
-  0% {
-    opacity: 0;
-    transform: scale(0.68) rotate(24deg);
-  }
-  26% {
-    opacity: 0.3;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.28) rotate(-52deg);
-  }
+.atlas-extension-toggle:hover .atlas-extension-mark,
+.atlas-extension-toggle:focus-visible .atlas-extension-mark,
+.atlas-extension-toggle[aria-expanded="true"] .atlas-extension-mark {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 6px 18px color-mix(in srgb, CanvasText 16%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .atlas-extension-neko-image {
-    transition: opacity 120ms linear;
-  }
-
-  .atlas-extension-neko-wave::before,
-  .atlas-extension-neko-wave::after {
-    animation: none !important;
-    opacity: 0 !important;
+  .atlas-extension-mark {
+    transition: none;
   }
 }
 
