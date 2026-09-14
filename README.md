@@ -61,6 +61,12 @@ Sign-in is initiated only by an explicit user action. The service worker obtains
 
 The content script never receives or stores a client secret. Session/access state should still be treated as sensitive browser data.
 
+## Project-aware composer controls
+
+The extension can discover visible native ChatGPT project links and store an explicitly selected subset locally. On a genuinely new selected project route, it may insert a configurable bootstrap prompt only when the composer is still unique and empty and the conversation has no user or assistant messages. It never auto-sends, overwrites existing conversation state, or calls undocumented ChatGPT project APIs.
+
+The composer toggle uses packaged Neko artwork with a bounded hover/focus transition. The images are immutable extension assets and the web-accessible-resource grant remains scoped to chatgpt.com; reduced-motion preferences disable the animated ripple.
+
 ## Workflow actions
 
 The extension recognizes the existing fenced `atlas-actions` envelope for compatibility. Supported actions are bounded and validated before display. The extension never treats arbitrary assistant text as executable code.

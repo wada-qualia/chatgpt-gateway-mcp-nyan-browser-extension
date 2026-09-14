@@ -15,7 +15,7 @@ type JsonSchemaNode = {
 };
 
 export const atlasActionsSchema = {
-  $id: "https://example.com/contracts/chatgpt-extension/v1/atlas-actions.schema.json",
+  $id: "https://k-lab.su/contracts/chatgpt-extension/v1/atlas-actions.schema.json",
   type: "object",
   additionalProperties: false,
   required: ["schema_version", "workflow", "actions"],
